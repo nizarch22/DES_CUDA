@@ -9,7 +9,7 @@
 #define NUM_THREADS 128
 #define NUM_TESTS 300
 
-__global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char** matrices1D, uint64_t* results)
+__global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char* matrices, uint64_t* results)
 {
 	int tid = threadIdx.x + blockIdx.x * blockDim.x;
 	// load matrices

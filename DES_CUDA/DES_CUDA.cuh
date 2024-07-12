@@ -3,7 +3,7 @@
 // External
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#include "DES_CUDA.cuh"
+
 
 __device__ void swapLR(uint64_t& input); // Swap left (32 bit) and right (32 bit) parts of the 64 bit input.
 __device__ void substitute(uint64_t& input);
