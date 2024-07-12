@@ -12,29 +12,30 @@
 __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char* matrices, unsigned char* sboxes, uint64_t* results)
 {
 	int tid = threadIdx.x + blockIdx.x * blockDim.x;
-	// load matrices
 	uint64_t result; // setting alias for encryption
 
 	uint64_t input = messages[tid];
 	uint64_t shiftedKey = keys[tid];
 	uint64_t permutedRoundKey;
 	uint64_t left; // last 32 bits of plaintext/input to algorithm are preserved in this variable 
+
+	// load matrices
+	// essential variables
 	unsigned char* cIP, * cPC1, * cPC2, * cE, * cPMatrix, * cIPInverse, * cLCS;
-	//unsigned char** cMatrices = {cIP, cPC1, cPC2, cE, cPMatrix, cIPInverse, cLCS};
 	int matricesSizes[7] = { 64,56,48,48,32,64,16 };
-	//int count = 0;
-	//for (int i = 0; i < 7; i++)
-	//{
-	//	cMatrices[i] = matrices+count;
-	//	count += matricesSizes[i];
-	//}
-	cIP = matrices;
-	cPC1 = matrices + matricesSizes[0];
-	cPC2 = matrices + matricesSizes[1];
-	cE = matrices + matricesSizes[2];
-	cPMatrix = matrices + matricesSizes[3];
-	cIPInverse = matrices + matricesSizes[4];
-	cLCS = matrices + matricesSizes[5];
+
+	// loading matrices process
+	int offset = 0;
+	unsigned char* temp = matrices;
+	cIP = temp; temp += matricesSizes[0];
+	cPC1 = temp; temp += matricesSizes[1];
+	cPC2 = temp; temp += matricesSizes[2];
+	cE = temp; temp += matricesSizes[3];
+	cPMatrix = temp; temp += matricesSizes[4];
+	cIPInverse = temp; temp += matricesSizes[5];
+	cLCS = temp;
+
+
 	// Initial operations 
 	permuteMatrixCuda(input, cIP, 64); //initialPermutation(input);
 	permuteMatrixCuda(shiftedKey, cPC1, 56); // PC1 of key
@@ -81,24 +82,19 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char
 __global__ void EncryptDESCudaDebug(uint64_t* messages, uint64_t* keys, unsigned char* matrices, unsigned char* sboxes, uint64_t* results, uint64_t* debug, int n)
 {
 	int tid = threadIdx.x + blockIdx.x * blockDim.x;
-	// load matrices
 	uint64_t result; // setting alias for encryption
 
 	uint64_t input = messages[tid];
 	uint64_t shiftedKey = keys[tid];
 	uint64_t permutedRoundKey;
 	uint64_t left; // last 32 bits of plaintext/input to algorithm are preserved in this variable 
+	
+	// load matrices
+	// essential variables
 	unsigned char* cIP, * cPC1, * cPC2, * cE, * cPMatrix, * cIPInverse, * cLCS;
-	unsigned char* cMatrices[7] = {cIP, cPC1, cPC2, cE, cPMatrix, cIPInverse, cLCS};
 	int matricesSizes[7] = { 64,56,48,48,32,64,16 };
-	//int offset = 0;
-	//unsigned char** temp;
-	//for (int i = 0; i < 7; i++)
-	//{
-	//	temp = cMatrices[i];
-	//	temp = matrices+offset;
-	//	offset += matricesSizes[i];
-	//}
+
+	// loading matrices process
 	int offset = 0;
 	unsigned char* temp = matrices;
 	cIP = temp; temp += matricesSizes[0];
@@ -108,6 +104,7 @@ __global__ void EncryptDESCudaDebug(uint64_t* messages, uint64_t* keys, unsigned
 	cPMatrix = temp; temp += matricesSizes[4];
 	cIPInverse = temp; temp += matricesSizes[5];
 	cLCS = temp;
+
 	// Initial operations 
 	permuteMatrixCuda(input, cIP, 64); //initialPermutation(input);
 	debug[0 + tid * n] = input;

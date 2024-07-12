@@ -13,7 +13,7 @@ int main()
 {
     // kernel parameters
     const int numThreads = 512;
-    const int numMessages = 4194304;
+    const int numMessages = 524288;// 4MB - 10x speedup//33554432; // 268MB - 223 speedup!
     const int numBlocks = (numMessages + numThreads - 1) / numThreads;
 
     // size parameters
@@ -46,8 +46,10 @@ int main()
 
     int startTimeAlloc = clock();
     // cuda allocate memory - matrices, sboxes
-    cudaMalloc(&d_matrices, 328);
-    cudaMalloc(&d_SBoxes, 8*64);
+    const int matricesSize = 328;
+    const int sboxesSize= 512;
+    cudaMalloc(&d_matrices, matricesSize);
+    cudaMalloc(&d_SBoxes, sboxesSize);
     // cuda allocate memory - messages, keys
     cudaMalloc(&d_messages, bytesMessages);
     cudaMalloc(&d_keys, bytesKeys);
@@ -103,17 +105,8 @@ int main()
     // Debugging stage
     // 
     // 
-    const int numDebugs = 12;
-    const int numTotalDebugs = numDebugs * numMessages;
-    const int sizeDebug = (numTotalDebugs) * sizeof(uint64_t);
-    uint64_t* arrDebug = (uint64_t*)malloc(sizeDebug);
-    uint64_t* cudaArrDebug = (uint64_t*)malloc(sizeDebug);
-    // malloc
-    uint64_t* d_arrDebug;
-    cudaMalloc(&d_arrDebug, sizeDebug);
-    EncryptDESCudaDebug << <numBlocks, numThreads >> > (d_messages, d_keys, d_matrices, d_SBoxes, d_resultsEncryption, d_arrDebug, numDebugs);
+    EncryptDESCuda << <numBlocks, numThreads >> > (d_messages, d_keys, d_matrices, d_SBoxes, d_resultsEncryption);
     // copy result from cuda
-    cudaMemcpy(cudaArrDebug, d_arrDebug, sizeDebug, cudaMemcpyDeviceToHost);
     cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages, cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
     int endTime = clock();
@@ -122,7 +115,7 @@ int main()
     startTime = clock();
     for (int i = 0; i < numMessages; i++)
     {
-        EncryptDESDebug(messages[i], keys[i], encryptions[i], arrDebug);
+        EncryptDES(messages[i], keys[i], encryptions[i]);
     }
     endTime = clock();
     int CPUTime = endTime - startTime;
@@ -138,37 +131,20 @@ int main()
     std::cout << "Total speedup: " << speedup << "\n";
     std::cout << "speedup without counting allocation: " << speedupCopy << "\n";
 
-    //bool bEqual = 1;
-    //uint64_t encryption;
-    //for (int j = 0; j < numMessages; j++)
-    //{
-    //    //EncryptDESDebug(messages[j], keys[j], encryption, arrDebug);
-    //    for (int i = 0; i < numDebugs-1; i++)
-    //    {
-    //        if (cudaArrDebug[i+j*numDebugs] != arrDebug[i])
-    //        {
-    //            std::cout << "Fail happened at " << i << " on message number " << j << "\n";
-    //            printMatrix(cudaArrDebug[i + j * numDebugs], 8, 8);
-    //            printMatrix(arrDebug[i], 8, 8);
-    //            // extra
-    //            std::cout << "CUDA: " << cudaArrDebug[i + j * numDebugs] << "\nCPU: " << arrDebug[i] << "\n";
-    //            std::cout << "Extras:\n";
-    //            uint64_t extraVariable = messages[0];
-    //            std::cout << "CUDA: " << cudaArrDebug[11 + j * numDebugs] << "\nCPU: " << extraVariable << "\n";
-    //            //std::cout << cudaArrDebug[11+j*numDebugs] << "\n";
-    //            bEqual = 0;
-    //            break;
-    //        }
-    //        bEqual &= (resultsEncryption[j] == encryption);
-    //    }
-    //}
-    //if (bEqual)
-    //{
-    //    std::cout << "Success!\n";
-    //}
-    // Decryption cuda stage
-    //
-    //
+    // confirming that indeed we have the correction results
+    bool bEqual;
+    for (int i = 0; i < numMessages; i++)
+    {
+        bEqual &= (encryptions[i] == resultsEncryption[i]);
+    }
+    if (!bEqual)
+    {
+        std::cout << "Success!\n";
+    }
+
+     //Decryption cuda stage
+    
+    
     return 0;
 
    // return 0;
