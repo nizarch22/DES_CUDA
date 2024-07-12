@@ -6,22 +6,36 @@
 #include <iostream>
 
 __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char* matrices, unsigned char* sboxes, uint64_t* results);
+__global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, unsigned char* matrices, unsigned char* sboxes, uint64_t* results);
 __global__ void EncryptDESCudaDebug(uint64_t* messages, uint64_t* keys, unsigned char* matrices, unsigned char* sboxes, uint64_t* results, uint64_t* debug, int n);
 void EncryptDESDebug(const uint64_t& plaintext, const uint64_t& key, uint64_t& encryption, uint64_t* debug);
 void printCharMatrix(unsigned char* matrix, int y, int x);
+
+// Checks cuda errors. Exits if detected. 
+// This may be helpful in release mode, where the kernel may not run if we demand too many resources.
+#define CHECK_CUDA_ERROR(call) \
+{ \
+    cudaError_t err = call; \
+    if (err != cudaSuccess) \
+    { \
+        fprintf(stderr, "CUDA Error: %s (error code %d) at %s:%d\n", \
+                cudaGetErrorString(err), err, __FILE__, __LINE__); \
+        exit(EXIT_FAILURE); \
+    } \
+} 
+
 int main()
 {
     // kernel parameters
-    const int numThreads = 512;
-    const int numMessages = 524288;// 4MB - 10x speedup//33554432; // 268MB - 223 speedup!
+    const int numThreads = 256;
+    const int numMessages = 524288;// 524288 -  4MB - 10x speedup. 33554432 - 256MB - 70x speedup!
     const int numBlocks = (numMessages + numThreads - 1) / numThreads;
 
     // size parameters
     int bytesMessages = sizeof(uint64_t) * numMessages;
     int bytesKeys = sizeof(uint64_t) * numMessages;
 
-    // kernel argument prep stage
-    // 
+    //// Kernel arguments prep stage ////
     // prep matrices, sboxes
     unsigned char* d_SBoxes, * d_matrices;
     unsigned char* matrices[7] = {IP,PC1,PC2, E, PMatrix,IPInverse, LCS};
@@ -44,7 +58,7 @@ int main()
     uint64_t* encryptions = (uint64_t*)malloc(bytesMessages);
     uint64_t* decryptions = (uint64_t*)malloc(bytesMessages);
 
-    int startTimeAlloc = clock();
+    int startTimeAlloc = clock(); // Used to measure the time GPU finishes execution since allocation started.
     // cuda allocate memory - matrices, sboxes
     const int matricesSize = 328;
     const int sboxesSize= 512;
@@ -57,7 +71,7 @@ int main()
     cudaMalloc(&d_resultsEncryption, bytesMessages);
     cudaMalloc(&d_resultsDecryption, bytesMessages);
 
-    int startTime = clock();
+    int startTimeCopy = clock(); // Used to measure the time GPU finishes execution since copying started.
     // cuda copy memory - matrices, sboxes
     cudaMemcpy(d_SBoxes, &SBoxes[0][0], 64*8, cudaMemcpyHostToDevice);
     int offset = 0;
@@ -70,59 +84,39 @@ int main()
     cudaMemcpy(d_messages, messages, bytesMessages, cudaMemcpyHostToDevice);
     cudaMemcpy(d_keys, keys, bytesKeys, cudaMemcpyHostToDevice);
 
-    // Encryption cuda stage
-    //
-    //
-    //EncryptDESCuda<<<numBlocks,numThreads>>>(d_messages, d_keys, d_matrices, d_SBoxes, d_resultsEncryption);
-
-    //// results retrieval stage
-    ////
-    ////
-    //cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages, cudaMemcpyDeviceToHost);
-    //cudaDeviceSynchronize(); // remove?
-    //for (int i = 0; i < numMessages; i++)
-    //{
-    //    //printMatrix(resultsEncryption[i], 8, 8);
-    //}
-    //
-    //// CPU validate encryption results stage
-    ////
-    ////
-    //int bSame = 1;
-    //uint64_t message, key, encryption;
-    //for (int i = 0; i < numMessages; i++)
-    //{
-    //    message = messages[i]; key = keys[i];
-    //    EncryptDES(messages[i], keys[i], encryption);
-    //    bSame &= encryption == resultsEncryption[i];
-    //    if (!bSame)
-    //    {
-    //        //std::cout << "Operation failed!\n";
-    //        //printMatrix(encryption, 8, 8);
-    //    }
-    //}
-
-    // Debugging stage
-    // 
-    // 
+    //// Run Encryption & Decryption in CUDA stage ////
+    // We encrypt the messages using EncryptDESCuda. Then, we use all those encrypted messages to run DecryptDESCuda.
     EncryptDESCuda << <numBlocks, numThreads >> > (d_messages, d_keys, d_matrices, d_SBoxes, d_resultsEncryption);
-    // copy result from cuda
+    cudaDeviceSynchronize(); // wait for encrypt to finish
+    DecryptDESCuda << <numBlocks, numThreads >> > (d_resultsEncryption, d_keys, d_matrices, d_SBoxes, d_resultsDecryption);
+    
+    // cuda copy results 
     cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages, cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
-    int endTime = clock();
-    int CUDATime = endTime - startTimeAlloc;
-    int CUDATimeCopy = endTime - startTime;
-    startTime = clock();
+    cudaMemcpy(resultsDecryption, d_resultsDecryption, bytesMessages, cudaMemcpyDeviceToHost);
+    int endTimeGPU = clock();
+
+    // cuda check for errors in CUDA execution
+    CHECK_CUDA_ERROR(cudaGetLastError());
+
+
+    //// Runtime measurement and calculation stage ////
+    // Calculate timings for CUDA, CPU execution. 
+    // CUDA has 2 timing calculations: one with allocation time and one without. The reason is that the allocation time is very big, and impactful for small input data (where CPU performs better than the GPU).
+
+    int startTimeCPU = clock();
     for (int i = 0; i < numMessages; i++)
     {
         EncryptDES(messages[i], keys[i], encryptions[i]);
-        //DecryptDES(encryptions[i], keys[i], decryptions[i]);
+        DecryptDES(encryptions[i], keys[i], decryptions[i]);
     }
-    endTime = clock();
-    int CPUTime = endTime - startTime;
+    int endTimeCPU = clock();
+    int CPUTime = endTimeCPU - startTimeCPU;
+    int CUDATime = endTimeGPU - startTimeAlloc;
+    int CUDATimeCopy = endTimeGPU - startTimeCopy;
 
+    // printout of timing results
     std::cout << "CUDA Debug results:\n";
-
+    std::cout << "Total messages size: " << (numMessages >> 17) << "MB\n";
     std::cout << "Total time to allocate memory + copy memory back and forth:\n";
     std::cout << "GPU: " << CUDATime << "ms\n";
     std::cout << "CPU: " << CPUTime << "ms\n";
@@ -132,112 +126,52 @@ int main()
     std::cout << "Total speedup: " << speedup << "\n";
     std::cout << "speedup without counting allocation: " << speedupCopy << "\n";
 
-    // confirming that indeed we have the correction results
-    bool bEqual = 1;
+    
+    //// GPU-CPU encryption-decryption validation stage ////
+    bool bEqualDecrypt = 1; bool bEqualEncrypt = 1;
     for (int i = 0; i < numMessages; i++)
     {
-        bEqual &= (encryptions[i] == resultsEncryption[i]);
+        bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
+        if(!bEqualDecrypt)
+        {
+            std::cout << "Decryption-message comparison failed at " << i << "\n";
+            std::cout << resultsDecryption[i] << " - ";
+            std::cout << messages[i] << "\n";
+            break;
+        }
+
+        bEqualEncrypt &= (resultsEncryption[i] == encryptions[i]);
+        if (!bEqualEncrypt)
+        {
+            std::cout << "CPU-GPU Encryption comparison failed at " << i << "\n";
+            std::cout << resultsDecryption[i] << " - ";
+            std::cout << messages[i] << "\n";
+            break;
+        }
+
     }
-    if (bEqual)
+
+    if (bEqualDecrypt && bEqualEncrypt)
     {
         std::cout << "Success!\n";
     }
 
-     //Decryption cuda stage
-    
-    
-    return 0;
+    //// Memory release stage ////
 
-   // return 0;
-   // // break here.
-   // int* c = (int*)malloc(bytes+sizeof(int));
-   // int* d_c;
-   // cudaMalloc(&d_c, bytes+4);
-   // for (int i = 0; i < arraySize; i++)
-   // {
-   //     c[i] = 1000;
-   // }
-   // cudaMemcpy(d_c, c, (bytes), cudaMemcpyHostToDevice);
-
-   // // Add vectors in parallel.
-   // //EncryptDESCuda <<<1, 1>>>(d_c);
-   // //if (cudaStatus != cudaSuccess) {
-   // //    fprintf(stderr, "addWithCuda failed!");
-   // //    return 1;
-   // //}
-   //cudaMemcpy(c, d_c, bytes+4, cudaMemcpyDeviceToHost);
-   //for (int i = 0; i < arraySize+1; i++)
-   //{
-   //    std::cout << c[i] << ",";
-   //}
-   //std::cout << "\n";
-   // printf("{1,2,3,4,5} + {10,20,30,40,50} = {%d,%d,%d,%d,%d}\n",
-        //c[0], c[1], c[2], c[3], c[4]);
-
-    // cudaDeviceReset must be called before exiting in order for profiling and
-    // tracing tools such as Nsight and Visual Profiler to show complete traces.
-    //cudaStatus = cudaDeviceReset();
-    //if (cudaStatus != cudaSuccess) {
-    //    fprintf(stderr, "cudaDeviceReset failed!");
-    //    return 1;
-    //}
+    // CPU
+    free(messages);
+    free(keys);
+    free(resultsEncryption);
+    free(resultsDecryption);
+    free(encryptions);
+    free(decryptions);
+    // GPU/CUDA
+    CHECK_CUDA_ERROR(cudaFree(d_matrices));
+    CHECK_CUDA_ERROR(cudaFree(d_SBoxes));
+    CHECK_CUDA_ERROR(cudaFree(d_messages));
+    CHECK_CUDA_ERROR(cudaFree(d_keys));
+    CHECK_CUDA_ERROR(cudaFree(d_resultsEncryption));
+    CHECK_CUDA_ERROR(cudaFree(d_resultsDecryption));
 
     return 0;
 }
-
-
-
-void printCharMatrix(unsigned char* matrix, int y, int x)
-{
-    //bool bit;
-    //bool mask = 1;
-    for (int i = 0; i < y; i++)
-    {
-        for (int j = 0; j < x; j++)
-        {
-
-            //bit = matrix & mask;
-            std::cout << matrix[i*y+j] << ",";
-            //matrix >>= 1;
-        }
-        std::cout << "\n";
-    }
-    std::cout << "Matrix printed.\n";
-}
-
-cudaError_t addWithCuda(int* c, const int* a, const int* b, unsigned int size);
-
-__global__ void addKernel(int* c, const int* a, const int* b)
-{
-    int i = threadIdx.x;
-    c[i] = a[i] + b[i];
-}
-
-__global__ void lengthTest(unsigned char* matrices, unsigned char* sboxes, unsigned char* results)
-{
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    results[tid] = sboxes[tid];
-}
-
-__global__ void cudaTest(unsigned char* a, unsigned char* b)
-{
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-
-    b[tid] = tid;
-}
-
-// major helper functions
-//__device__ void permuteMatrixCuda()
-//{
-//
-//}
-//__device__ void substituteCuda()
-//{
-//
-//}
-//__device__ void leftCircularShiftCuda()
-//{
-//
-//}
-//__device__ void 
-
