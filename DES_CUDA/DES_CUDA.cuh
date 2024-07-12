@@ -5,13 +5,13 @@
 #include "device_launch_parameters.h"
 
 
-__device__ void swapLR(uint64_t& input); // Swap left (32 bit) and right (32 bit) parts of the 64 bit input.
-__device__ void substitute(uint64_t& input);
-__device__ void leftCircularShift(uint32_t& input, uint8_t times);
-__device__ void generateShiftedKey(const int& index, uint64_t& roundKey);
-__device__ void permuteMatrix(uint64_t& input, const unsigned char* P, const unsigned int size);
+__device__ void swapLRCuda(uint64_t& input); // Swap left (32 bit) and right (32 bit) parts of the 64 bit input.
+__device__ void substituteCuda(uint64_t& input, unsigned char* sboxes);
+__device__ void leftCircularShiftCuda(uint32_t& input, uint8_t times);
+__device__ void generateShiftedKeyCuda(const int& index, uint64_t& roundKey, unsigned char* cLCS);
+__device__ void permuteMatrixCuda(uint64_t& input, const unsigned char* P, const unsigned int size);
 
-__global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* matrices, uint64_t* results);
+__global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char* matrices, unsigned char* sboxes, uint64_t* results);
 //void DecryptDES(const uint64_t& encryption, const uint64_t& key, uint64_t& decryption);
 //void InitKeyDES(uint64_t& key);
 //

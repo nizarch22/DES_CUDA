@@ -77,10 +77,17 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <CudaCompile Include="DES_CUDA.cu" />
     <CudaCompile Include="kernel.cu" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DES.h" />
+    <ClInclude Include="DES_CUDA.cuh" />
     <ClInclude Include="DES_Matrices_NIST.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="DES.cpp" />
+    <ClCompile Include="DES_Matrices_NIST.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
