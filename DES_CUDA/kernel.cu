@@ -20,7 +20,7 @@ void printCharMatrix(unsigned char* matrix, int y, int x);
                     cudaGetErrorString(err), err, __FILE__, __LINE__); \
             exit(EXIT_FAILURE); \
         } \
-    }
+    } 
 
 int main()
 {
