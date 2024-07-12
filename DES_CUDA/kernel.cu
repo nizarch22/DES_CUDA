@@ -12,8 +12,8 @@ void printCharMatrix(unsigned char* matrix, int y, int x);
 int main()
 {
     // kernel parameters
-    const int numThreads = 2;
-    const int numMessages = 2;
+    const int numThreads = 128;
+    const int numMessages = 1024;
     const int numBlocks = (numMessages + numThreads - 1) / numThreads;
 
     // size parameters
@@ -98,7 +98,7 @@ int main()
     // 
     // 
     const int numDebugs = 12;
-    const int numTotalDebugs = numDebugs * numThreads;
+    const int numTotalDebugs = numDebugs * numMessages;
     const int sizeDebug = (numTotalDebugs) * sizeof(uint64_t);
     uint64_t arrDebug[numTotalDebugs];
     uint64_t cudaArrDebug[numTotalDebugs];
@@ -109,12 +109,13 @@ int main()
     EncryptDESCudaDebug << <numBlocks, numThreads >> > (d_messages, d_keys, d_matrices, d_SBoxes, d_resultsEncryption, d_arrDebug, numDebugs);
     // copy result from cuda
     cudaMemcpy(cudaArrDebug, d_arrDebug, sizeDebug, cudaMemcpyDeviceToHost);
+    cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages, cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
 
     std::cout << "CUDA Debug results:\n";
     
-    bool bEqual = 0;
-    for (int j = 0; j < numThreads; j++)
+    bool bEqual = 1;
+    for (int j = 0; j < numMessages; j++)
     {
         EncryptDESDebug(messages[j], keys[j], encryption, arrDebug);
         for (int i = 0; i < numDebugs-1; i++)
@@ -138,6 +139,16 @@ int main()
     if (bEqual)
     {
         std::cout << "Success!\n";
+    }
+    for (int i = 0; i < numMessages; i++)
+    {
+        if (i % 20 == 0)
+        {
+            std::cout << "\n";
+        }
+        EncryptDESDebug(messages[i], keys[i], encryption, arrDebug);
+        std::cout << (encryption == resultsEncryption[i]) << ",";
+
     }
     // Decryption cuda stage
     //
