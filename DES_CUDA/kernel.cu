@@ -13,7 +13,7 @@ int main()
 {
     // kernel parameters
     const int numThreads = 128;
-    const int numMessages = 1024;
+    const int numMessages = 4096;
     const int numBlocks = (numMessages + numThreads - 1) / numThreads;
 
     // size parameters
@@ -131,24 +131,16 @@ int main()
                 uint64_t extraVariable = messages[0];
                 std::cout << "CUDA: " << cudaArrDebug[11 + j * numDebugs] << "\nCPU: " << extraVariable << "\n";
                 //std::cout << cudaArrDebug[11+j*numDebugs] << "\n";
-                bEqual = 1;
+                bEqual = 0;
                 break;
             }
+            bEqual &= (resultsEncryption[j] == encryption);
+            //std::cout << resultsEncryption[j] << "\n";
         }
     }
     if (bEqual)
     {
         std::cout << "Success!\n";
-    }
-    for (int i = 0; i < numMessages; i++)
-    {
-        if (i % 20 == 0)
-        {
-            std::cout << "\n";
-        }
-        EncryptDESDebug(messages[i], keys[i], encryption, arrDebug);
-        std::cout << (encryption == resultsEncryption[i]) << ",";
-
     }
     // Decryption cuda stage
     //
