@@ -12,8 +12,8 @@ void printCharMatrix(unsigned char* matrix, int y, int x);
 int main()
 {
     // kernel parameters
-    const int numThreads = 256;
-    const int numMessages = 524288;
+    const int numThreads = 512;
+    const int numMessages = 4194304;
     const int numBlocks = (numMessages + numThreads - 1) / numThreads;
 
     // size parameters
@@ -44,6 +44,7 @@ int main()
     uint64_t* encryptions = (uint64_t*)malloc(bytesMessages);
     uint64_t* decryptions = (uint64_t*)malloc(bytesMessages);
 
+    int startTimeAlloc = clock();
     // cuda allocate memory - matrices, sboxes
     cudaMalloc(&d_matrices, 328);
     cudaMalloc(&d_SBoxes, 8*64);
@@ -55,8 +56,7 @@ int main()
     cudaMalloc(&d_resultsDecryption, bytesMessages);
 
     int startTime = clock();
-
-    // copy memory - matrices, sboxes
+    // cuda copy memory - matrices, sboxes
     cudaMemcpy(d_SBoxes, &SBoxes[0][0], 64*8, cudaMemcpyHostToDevice);
     int offset = 0;
     for (int i = 0; i < 7; i++)
@@ -64,7 +64,7 @@ int main()
         cudaMemcpy(d_matrices + offset, &matrices[i][0], matricesSizes[i], cudaMemcpyHostToDevice);
         offset += matricesSizes[i];
     }
-    // copy memory - messages, keys
+    // cuda copy memory - messages, keys
     cudaMemcpy(d_messages, messages, bytesMessages, cudaMemcpyHostToDevice);
     cudaMemcpy(d_keys, keys, bytesKeys, cudaMemcpyHostToDevice);
 
@@ -117,7 +117,8 @@ int main()
     cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages, cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
     int endTime = clock();
-    int CUDATime = endTime - startTime;
+    int CUDATime = endTime - startTimeAlloc;
+    int CUDATimeCopy = endTime - startTime;
     startTime = clock();
     for (int i = 0; i < numMessages; i++)
     {
@@ -128,12 +129,14 @@ int main()
 
     std::cout << "CUDA Debug results:\n";
 
-    std::cout << "Time to send data and retrieve results:\n";
+    std::cout << "Total time to allocate memory + copy memory back and forth:\n";
     std::cout << "GPU: " << CUDATime << "ms\n";
     std::cout << "CPU: " << CPUTime << "ms\n";
-    
+    std::cout << "GPU - only since copying: " << CUDATimeCopy << "ms\n";
     double speedup = (float)CPUTime / CUDATime;
+    double speedupCopy = (float)CPUTime / CUDATimeCopy;
     std::cout << "Total speedup: " << speedup << "\n";
+    std::cout << "speedup without counting allocation: " << speedupCopy << "\n";
 
     //bool bEqual = 1;
     //uint64_t encryption;
@@ -261,78 +264,3 @@ __global__ void cudaTest(unsigned char* a, unsigned char* b)
 //}
 //__device__ void 
 
-
-void testPrint()
-{
-    unsigned char* matrices[7] = { IP,PC1,PC2, E, PMatrix,IPInverse, LCS };
-    int matricesSizes[7] = { 64,56,48,48,32,64,16 };
-    // cuda call memory test
-    unsigned char* arr; unsigned char* result;
-    arr = (unsigned char*)malloc(328);
-    result = (unsigned char*)malloc(328);
-
-    // setup memory
-    arr[0] = (char)244;
-    arr[1] = (char)211;
-
-    unsigned char* d_arr; unsigned char* d_result;
-    cudaMalloc(&d_arr, 328);
-    cudaMalloc(&d_result, 328);
-
-    // copy arr memory
-    int offset = 0;
-    for (int i = 0; i < 7; i++)
-    {
-        cudaMemcpy(d_arr + offset, &matrices[i][0], matricesSizes[i], cudaMemcpyHostToDevice);
-        offset += matricesSizes[i];
-    }
-    // run cuda
-    cudaTest << <1, 328 >> > (d_arr, d_result);
-    cudaMemcpy(result, d_result, 328, cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
-
-    offset = 0;
-    std::cout << "Result:\n";
-    for (int i = 0; i < 7; i++)
-    {
-        for (int j = 0; j < matricesSizes[i]; j++)
-            std::cout << (int)result[offset + j] << ",";
-        std::cout << "\n\n";
-        offset += matricesSizes[i];
-    }
-}
-
-void testPointerPrint()
-{
-    // doing testing
-    unsigned char* ptrTest = &(SBoxes[1][0]);
-    std::cout << SBoxes << "\n";
-    std::cout << &SBoxes << "\n";
-    std::cout << &(SBoxes[1]) << "\n";
-    std::cout << ptrTest << "\n";
-    std::cout << &(SBoxes[1][0]) << "\n";
-    std::cout << (int)*ptrTest << "\n";
-    std::cout << (int)*(ptrTest + 1) << "\n";
-    std::cout << (int)SBoxes[1][0] << "\n";
-    std::cout << (int)SBoxes[1][1] << "\n";
-
-    // copy test
-    unsigned char* test = (unsigned char*)malloc(64 * 8);
-    //memcpy(test, SBoxes, 64*8);
-
-    // copying each row of 64
-    unsigned char* temp1, * temp2;
-    for (int i = 0; i < 8; i++)
-    {
-        temp1 = test + i * 64;
-        temp2 = &SBoxes[i][0];
-        memcpy(temp1, temp2, 64);
-    }
-
-    // printout
-    for (int i = 0; i < 8; i++)
-    {
-        std::cout << (int)test[i * 64] << ",";
-    }
-    std::cout << "\n";
-}
