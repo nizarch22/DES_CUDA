@@ -9,6 +9,12 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char
 __global__ void EncryptDESCudaDebug(uint64_t* messages, uint64_t* keys, unsigned char* matrices, unsigned char* sboxes, uint64_t* results, uint64_t* debug, int n);
 void EncryptDESDebug(const uint64_t& plaintext, const uint64_t& key, uint64_t& encryption, uint64_t* debug);
 void printCharMatrix(unsigned char* matrix, int y, int x);
+
+__global__ void fooCudaCountTid(int* d_arrTid)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    d_arrTid[tid] = tid;
+}
 int main()
 {
     // kernel parameters
@@ -139,6 +145,20 @@ int main()
     {
         std::cout << "Success!\n";
     }
+    // tid testing
+    int arrTid[10] = { 10 }; int arrTidResult[10];
+    int* d_arrTid; 
+    cudaMalloc(&d_arrTid, 10*sizeof(int));
+    cudaMemcpy(d_arrTid, arrTid, 10 * sizeof(int), cudaMemcpyHostToDevice);
+    fooCudaCountTid<<<5,2>>>(d_arrTid);
+    cudaMemcpy(arrTidResult, d_arrTid, 10 * sizeof(int), cudaMemcpyDeviceToHost);
+
+    for (int i = 0; i < 10; i++)
+    {
+        std::cout << arrTidResult[i] << ",";
+    }
+    std::cout << "\n";
+
     // Decryption cuda stage
     //
     //
