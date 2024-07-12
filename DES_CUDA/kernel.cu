@@ -101,14 +101,23 @@ int main()
     //        //printMatrix(encryption, 8, 8);
     //    }
     //}
-
     // Debugging stage
     // 
     // 
-    EncryptDESCuda << <numBlocks, numThreads >> > (d_messages, d_keys, d_matrices, d_SBoxes, d_resultsEncryption);
+    //const int numDebugs = 12;
+    //const int numTotalDebugs = numDebugs * numMessages;
+    //const int sizeDebug = (numTotalDebugs) * sizeof(uint64_t);
+    //uint64_t* arrDebug = (uint64_t*)malloc(sizeDebug);
+    //uint64_t* cudaArrDebug = (uint64_t*)malloc(sizeDebug);
+    //// malloc
+    //uint64_t* d_arrDebug;
+    //cudaMalloc(&d_arrDebug, sizeDebug);
+    //EncryptDESCudaDebug << <numBlocks, numThreads >> > (d_messages, d_keys, d_matrices, d_SBoxes, d_resultsEncryption, d_arrDebug, numDebugs);
+    //cudaMemcpy(cudaArrDebug, d_arrDebug, sizeDebug, cudaMemcpyDeviceToHost);
+    EncryptDESCuda<<<numBlocks, numThreads>>> (d_messages, d_keys, d_matrices, d_SBoxes, d_resultsEncryption);
     // copy result from cuda
-    cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages, cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
+    cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages, cudaMemcpyDeviceToHost);
     int endTime = clock();
     int CUDATime = endTime - startTimeAlloc;
     int CUDATimeCopy = endTime - startTime;
@@ -116,7 +125,7 @@ int main()
     for (int i = 0; i < numMessages; i++)
     {
         EncryptDES(messages[i], keys[i], encryptions[i]);
-        //DecryptDES(encryptions[i], keys[i], decryptions[i]);
+        //EncryptDESDebug(messages[i], keys[i], encryptions[i], arrDebug);
     }
     endTime = clock();
     int CPUTime = endTime - startTime;
@@ -137,12 +146,40 @@ int main()
     for (int i = 0; i < numMessages; i++)
     {
         bEqual &= (encryptions[i] == resultsEncryption[i]);
-    }
-    if (bEqual)
-    {
-        std::cout << "Success!\n";
+        if (!bEqual)
+        {
+            std::cout << "Debug GPU-CPU comparison failed!\n";
+            std::cout << encryptions[i] << "\n";
+            std::cout << resultsEncryption[i] << "\n";
+
+            return 0;
+        }
     }
 
+
+    // confirm that CPU ones are good
+    bEqual = 1;
+    uint64_t* testing = (uint64_t*)malloc(bytesMessages);
+    for (int i = 0; i < numMessages; i++)
+    {
+        EncryptDES(messages[i], keys[i], testing[i]);
+        bEqual &= (encryptions[i] == testing[i]);
+    }
+    if (!bEqual)
+    {
+        std::cout << "CPU not equal!\n";
+        return 0;
+    }
+
+    for (int i = 0; i < numMessages; i++)
+    {
+        bEqual &= (testing[i] == resultsEncryption[i]);
+    }
+    if (!bEqual)
+    {
+        std::cout << "Debug GPU-CPU comparison failed!\n";
+        return 0;
+    }
      //Decryption cuda stage
     
     
