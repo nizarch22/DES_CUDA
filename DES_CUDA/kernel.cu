@@ -4,13 +4,7 @@
 #include "DES.h"
 #include <stdio.h>
 #include <iostream>
-
-__global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char* matrices, unsigned char* sboxes, uint64_t* results);
-__global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, unsigned char* matrices, unsigned char* sboxes, uint64_t* results);
-__global__ void EncryptDESCudaDebug(uint64_t* messages, uint64_t* keys, unsigned char* matrices, unsigned char* sboxes, uint64_t* results, uint64_t* debug, int n);
-void EncryptDESDebug(const uint64_t& plaintext, const uint64_t& key, uint64_t& encryption, uint64_t* debug);
-void printCharMatrix(unsigned char* matrix, int y, int x);
-
+#include "DES_CUDA.cuh"
 // Checks cuda errors. Exits if detected. 
 // This may be helpful in release mode, where the kernel may not run if we demand too many resources.
 #define CHECK_CUDA_ERROR(call) \
@@ -132,23 +126,17 @@ int main()
     for (int i = 0; i < numMessages; i++)
     {
         bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
-        if(!bEqualDecrypt)
-        {
-            std::cout << "Decryption-message comparison failed at " << i << "\n";
-            std::cout << resultsDecryption[i] << " - ";
-            std::cout << messages[i] << "\n";
-            break;
-        }
-
         bEqualEncrypt &= (resultsEncryption[i] == encryptions[i]);
-        if (!bEqualEncrypt)
-        {
-            std::cout << "CPU-GPU Encryption comparison failed at " << i << "\n";
-            std::cout << resultsDecryption[i] << " - ";
-            std::cout << messages[i] << "\n";
-            break;
-        }
-
+    }
+    if (!bEqualDecrypt)
+    {
+        std::cout << "Decryption-message comparison failed!\n";
+        return 0;
+    }
+    if (!bEqualEncrypt)
+    {
+        std::cout << "CPU-GPU Encryption comparison failed!\n";
+        return 0;
     }
 
     if (bEqualDecrypt && bEqualEncrypt)

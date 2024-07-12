@@ -4,6 +4,15 @@
 #include "device_launch_parameters.h"
 #include "DES_CUDA.cuh"
 
+__device__ void generateReverseShiftedKeyCuda(const int& index, uint64_t& roundKey, unsigned char* cLCS);
+__device__ void rightCircularShiftCuda(uint32_t& input, uint8_t times);
+__device__ void fullShiftLCSCuda(uint64_t& roundKey);
+__device__ void swapLRCuda(uint64_t& input); // Swap left (32 bit) and right (32 bit) parts of the 64 bit input.
+__device__ void substituteCuda(uint64_t& input, unsigned char* sboxes);
+__device__ void leftCircularShiftCuda(uint32_t& input, uint8_t times);
+__device__ void generateShiftedKeyCuda(const int& index, uint64_t& roundKey, unsigned char* cLCS);
+__device__ void permuteMatrixCuda(uint64_t& input, const unsigned char* P, const unsigned int size);
+
 __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char* matrices, unsigned char* sboxes, uint64_t* results)
 {
 	int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -20,7 +29,6 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char
 	int matricesSizes[7] = { 64,56,48,48,32,64,16 };
 
 	// loading matrices process
-	int offset = 0;
 	unsigned char* temp = matrices;
 	cIP = temp; temp += matricesSizes[0];
 	cPC1 = temp; temp += matricesSizes[1];
@@ -88,7 +96,6 @@ __global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, unsigned c
 	int matricesSizes[7] = { 64,56,48,48,32,64,16 };
 
 	// loading matrices process
-	int offset = 0;
 	unsigned char* temp = matrices;
 	cIP = temp; temp += matricesSizes[0];
 	cPC1 = temp; temp += matricesSizes[1];
@@ -159,7 +166,6 @@ __global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, unsigned c
 //	int matricesSizes[7] = { 64,56,48,48,32,64,16 };
 //
 //	// loading matrices process
-//	int offset = 0;
 //	unsigned char* temp = matrices;
 //	cIP = temp; temp += matricesSizes[0];
 //	cPC1 = temp; temp += matricesSizes[1];
@@ -231,7 +237,6 @@ __global__ void EncryptDESCudaDebug(uint64_t* messages, uint64_t* keys, unsigned
 	int matricesSizes[7] = { 64,56,48,48,32,64,16 };
 
 	// loading matrices process
-	int offset = 0;
 	unsigned char* temp = matrices;
 	cIP = temp; temp += matricesSizes[0];
 	cPC1 = temp; temp += matricesSizes[1];
