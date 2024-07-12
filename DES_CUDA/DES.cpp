@@ -214,7 +214,7 @@ void InitKeyDES(uint64_t& key)
 }
 void EncryptDES(const uint64_t& plaintext, const uint64_t& key, uint64_t& encryption)
 {
-	uint64_t& result = encryption; // setting alias for decryption
+	uint64_t& result = encryption; // setting alias for encryption
 
 	uint64_t input = plaintext;
 	uint64_t shiftedKey = key;

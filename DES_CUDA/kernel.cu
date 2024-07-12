@@ -116,6 +116,7 @@ int main()
     for (int i = 0; i < numMessages; i++)
     {
         EncryptDES(messages[i], keys[i], encryptions[i]);
+        //DecryptDES(encryptions[i], keys[i], decryptions[i]);
     }
     endTime = clock();
     int CPUTime = endTime - startTime;
@@ -132,12 +133,12 @@ int main()
     std::cout << "speedup without counting allocation: " << speedupCopy << "\n";
 
     // confirming that indeed we have the correction results
-    bool bEqual;
+    bool bEqual = 1;
     for (int i = 0; i < numMessages; i++)
     {
         bEqual &= (encryptions[i] == resultsEncryption[i]);
     }
-    if (!bEqual)
+    if (bEqual)
     {
         std::cout << "Success!\n";
     }
