@@ -9,10 +9,23 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char
 __global__ void EncryptDESCudaDebug(uint64_t* messages, uint64_t* keys, unsigned char* matrices, unsigned char* sboxes, uint64_t* results, uint64_t* debug, int n);
 void EncryptDESDebug(const uint64_t& plaintext, const uint64_t& key, uint64_t& encryption, uint64_t* debug);
 void printCharMatrix(unsigned char* matrix, int y, int x);
+
+
+#define CHECK_CUDA_ERROR(call) \
+    { \
+        cudaError_t err = call; \
+        if (err != cudaSuccess) \
+        { \
+            fprintf(stderr, "CUDA Error: %s (error code %d) at %s:%d\n", \
+                    cudaGetErrorString(err), err, __FILE__, __LINE__); \
+            exit(EXIT_FAILURE); \
+        } \
+    }
+
 int main()
 {
     // kernel parameters
-    const int numThreads = 512;
+    const int numThreads = 256;
     const int numMessages = 524288;// 4MB - 10x speedup//33554432; // 268MB - 223 speedup!
     const int numBlocks = (numMessages + numThreads - 1) / numThreads;
 
@@ -39,6 +52,10 @@ int main()
     // prep results
     uint64_t* d_resultsEncryption, * d_resultsDecryption;
     uint64_t* resultsEncryption = (uint64_t*)malloc(bytesMessages);
+    for (int i = 0; i < numMessages; i++)
+    {
+        resultsEncryption[i] = 100;
+    }
     uint64_t* resultsDecryption = (uint64_t*)malloc(bytesMessages);
     // CPU-run DES Results
     uint64_t* encryptions = (uint64_t*)malloc(bytesMessages);
@@ -70,6 +87,7 @@ int main()
     cudaMemcpy(d_messages, messages, bytesMessages, cudaMemcpyHostToDevice);
     cudaMemcpy(d_keys, keys, bytesKeys, cudaMemcpyHostToDevice);
 
+    std::cout << resultsEncryption[10] << "\n";
     // Encryption cuda stage
     //
     //
@@ -115,9 +133,11 @@ int main()
     //EncryptDESCudaDebug << <numBlocks, numThreads >> > (d_messages, d_keys, d_matrices, d_SBoxes, d_resultsEncryption, d_arrDebug, numDebugs);
     //cudaMemcpy(cudaArrDebug, d_arrDebug, sizeDebug, cudaMemcpyDeviceToHost);
     EncryptDESCuda<<<numBlocks, numThreads>>> (d_messages, d_keys, d_matrices, d_SBoxes, d_resultsEncryption);
+    CHECK_CUDA_ERROR(cudaGetLastError());
     // copy result from cuda
-    cudaDeviceSynchronize();
-    cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages, cudaMemcpyDeviceToHost);
+    CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+    // Use the macro to check for errors
+    CHECK_CUDA_ERROR(cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages, cudaMemcpyDeviceToHost));
     int endTime = clock();
     int CUDATime = endTime - startTimeAlloc;
     int CUDATimeCopy = endTime - startTime;
@@ -148,7 +168,7 @@ int main()
         bEqual &= (encryptions[i] == resultsEncryption[i]);
         if (!bEqual)
         {
-            std::cout << "Debug GPU-CPU comparison failed!\n";
+            std::cout << "Debug GPU-CPU comparison failed at " << i << "!\n";
             std::cout << encryptions[i] << "\n";
             std::cout << resultsEncryption[i] << "\n";
 
@@ -168,7 +188,6 @@ int main()
     if (!bEqual)
     {
         std::cout << "CPU not equal!\n";
-        return 0;
     }
 
     for (int i = 0; i < numMessages; i++)
@@ -183,42 +202,6 @@ int main()
      //Decryption cuda stage
     
     
-    return 0;
-
-   // return 0;
-   // // break here.
-   // int* c = (int*)malloc(bytes+sizeof(int));
-   // int* d_c;
-   // cudaMalloc(&d_c, bytes+4);
-   // for (int i = 0; i < arraySize; i++)
-   // {
-   //     c[i] = 1000;
-   // }
-   // cudaMemcpy(d_c, c, (bytes), cudaMemcpyHostToDevice);
-
-   // // Add vectors in parallel.
-   // //EncryptDESCuda <<<1, 1>>>(d_c);
-   // //if (cudaStatus != cudaSuccess) {
-   // //    fprintf(stderr, "addWithCuda failed!");
-   // //    return 1;
-   // //}
-   //cudaMemcpy(c, d_c, bytes+4, cudaMemcpyDeviceToHost);
-   //for (int i = 0; i < arraySize+1; i++)
-   //{
-   //    std::cout << c[i] << ",";
-   //}
-   //std::cout << "\n";
-   // printf("{1,2,3,4,5} + {10,20,30,40,50} = {%d,%d,%d,%d,%d}\n",
-        //c[0], c[1], c[2], c[3], c[4]);
-
-    // cudaDeviceReset must be called before exiting in order for profiling and
-    // tracing tools such as Nsight and Visual Profiler to show complete traces.
-    //cudaStatus = cudaDeviceReset();
-    //if (cudaStatus != cudaSuccess) {
-    //    fprintf(stderr, "cudaDeviceReset failed!");
-    //    return 1;
-    //}
-
     return 0;
 }
 
