@@ -22,12 +22,12 @@ int main()
 {
     // kernel parameters
     const int numThreads = 256;
-    const int numMessages = 524288;// 524288 -  4MB - 10x speedup. 33554432 - 256MB - 70x speedup!
+    const int numMessages = 33554432;// 524288 -  4MB - 10x speedup. 33554432 - 256MB - 70x speedup!
     const int numBlocks = (numMessages + numThreads - 1) / numThreads;
 
     // size parameters
-    int bytesMessages = sizeof(uint64_t) * numMessages;
-    int bytesKeys = sizeof(uint64_t) * numMessages;
+    const int bytesMessages = sizeof(uint64_t) * numMessages;
+    const int bytesKeys = sizeof(uint64_t) * numMessages;
 
     //// Kernel arguments prep stage ////
     // prep matrices, sboxes
@@ -80,10 +80,12 @@ int main()
 
     //// Run Encryption & Decryption in CUDA stage ////
     // We encrypt the messages using EncryptDESCuda. Then, we use all those encrypted messages to run DecryptDESCuda.
+    int startTimeExecute = clock();
     EncryptDESCuda << <numBlocks, numThreads >> > (d_messages, d_keys, d_matrices, d_SBoxes, d_resultsEncryption);
     cudaDeviceSynchronize(); // wait for encrypt to finish
     DecryptDESCuda << <numBlocks, numThreads >> > (d_resultsEncryption, d_keys, d_matrices, d_SBoxes, d_resultsDecryption);
-    
+    cudaDeviceSynchronize();
+    int endTimeExecute = clock();
     // cuda copy results 
     cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages, cudaMemcpyDeviceToHost);
     cudaMemcpy(resultsDecryption, d_resultsDecryption, bytesMessages, cudaMemcpyDeviceToHost);
@@ -107,16 +109,20 @@ int main()
     int CPUTime = endTimeCPU - startTimeCPU;
     int CUDATime = endTimeGPU - startTimeAlloc;
     int CUDATimeCopy = endTimeGPU - startTimeCopy;
-
+    int CUDATimeExecute = endTimeExecute - startTimeExecute;
     // printout of timing results
     std::cout << "CUDA Debug results:\n";
-    std::cout << "Total messages size: " << (numMessages >> 17) << "MB\n";
-    std::cout << "Total time to allocate memory + copy memory back and forth:\n";
-    std::cout << "GPU: " << CUDATime << "ms\n";
+    std::cout << "Total messages size: " << (bytesMessages >> 20) << "MB\n";
+    std::cout << "Total timing measurements:\n";
+    std::cout << "GPU - with allocation: " << CUDATime << "ms\n";
+    std::cout << "GPU - with copying: " << CUDATimeCopy << "ms\n";
+    std::cout << "GPU - only kernel execution: " << CUDATimeExecute << "ms\n";
     std::cout << "CPU: " << CPUTime << "ms\n";
-    std::cout << "GPU - only since copying: " << CUDATimeCopy << "ms\n";
+    double throughput = 8.0f*1000.0f*(float)(bytesMessages >> 20) / CUDATimeExecute;
     double speedup = (float)CPUTime / CUDATime;
     double speedupCopy = (float)CPUTime / CUDATimeCopy;
+    std::cout << "Speed measurements:\n";
+    std::cout << "GPU - Execution speed: " << throughput << "Mbps\n";
     std::cout << "Total speedup: " << speedup << "\n";
     std::cout << "speedup without counting allocation: " << speedupCopy << "\n";
 
