@@ -1,6 +1,6 @@
 ## Description
 Uses DES algorithm in CPU and GPU (CUDA) to make a comparison in runtime. The comparison is output as printout.
-# How to use:
+## How to use:
 Go to kernel.cu.\
 Change numMessages to whatever you want (messages and keys are randomly generated).\
 Run in release mode for fastest results.
