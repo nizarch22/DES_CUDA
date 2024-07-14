@@ -125,29 +125,29 @@ int main()
         //}
         //endTimeCPU[testCount] = clock();
 
-        ////// GPU-CPU encryption-decryption validation stage ////
-        //for (int i = 0; i < numMessages[testCount]; i++)
-        //{
-        //    bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
-        //    bEqualEncrypt &= (resultsEncryption[i] == encryptions[i]);
-        //}
+        //// GPU-CPU encryption-decryption validation stage ////
+        for (int i = 0; i < numMessages[testCount]; i++)
+        {
+            //bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
+            bEqualEncrypt &= (resultsEncryption[i] == encryptions[i]);
+        }
     }
 
-    //if (!bEqualEncrypt)
-    //{
-    //    std::cout << "CPU-GPU Encryption comparison failed!\n";
-    //    return 0;
-    //}
+    if (!bEqualEncrypt)
+    {
+        std::cout << "CPU-GPU Encryption comparison failed!\n";
+        return 0;
+    }
     //if (!bEqualDecrypt)
     //{
     //    std::cout << "Decryption-message comparison failed!\n";
     //    return 0;
     //}
 
-    //if (bEqualDecrypt && bEqualEncrypt)
-    //{
-    //    std::cout << "Success!\n";
-    //}
+    if (bEqualDecrypt && bEqualEncrypt)
+    {
+        std::cout << "Success!\n";
+    }
 
     //// Runtime measurement and calculation stage ////
     // Calculate timings for CUDA, CPU execution. 
