@@ -111,7 +111,7 @@ int main()
         endTimeExecute[testCount] = clock();
         // cuda copy results 
         cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
-        //cudaMemcpy(resultsDecryption, d_resultsDecryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
+        cudaMemcpy(resultsDecryption, d_resultsDecryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
         endTimeRetrieveResults[testCount] = clock();
 
         // cuda check for errors in CUDA execution
