@@ -19,7 +19,7 @@
 } 
 
 #define NUM_TESTS 9
-#define NUM_TESTS_QUICK 9
+#define NUM_TESTS_QUICK 4
 int main()
 {
     // kernel parameters
@@ -85,7 +85,7 @@ int main()
     int startTimeInputCopy[NUM_TESTS]; int endTimeInputCopy[NUM_TESTS];
     int startTimeExecute[NUM_TESTS]; int endTimeExecute[NUM_TESTS];
     int endTimeRetrieveResults[NUM_TESTS];
-    //int startTimeCPU[NUM_TESTS]; int endTimeCPU[NUM_TESTS];
+    int startTimeCPU[NUM_TESTS]; int endTimeCPU[NUM_TESTS];
 
     for (int testCount = 0; testCount < NUM_TESTS_QUICK; testCount++)
     {
@@ -111,48 +111,48 @@ int main()
         endTimeExecute[testCount] = clock();
         // cuda copy results 
         cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
-        //cudaMemcpy(resultsDecryption, d_resultsDecryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
+        cudaMemcpy(resultsDecryption, d_resultsDecryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
         endTimeRetrieveResults[testCount] = clock();
 
         // cuda check for errors in CUDA execution
         CHECK_CUDA_ERROR(cudaGetLastError());
 
-        //startTimeCPU[testCount] = clock();
-        //for (int i = 0; i < numMessages[testCount]; i++)
-        //{
-        //    EncryptDES(messages[i], keys[i], encryptions[i]);
-        //    DecryptDES(encryptions[i], keys[i], decryptions[i]);
-        //}
-        //endTimeCPU[testCount] = clock();
+        startTimeCPU[testCount] = clock();
+        for (int i = 0; i < numMessages[testCount]; i++)
+        {
+            EncryptDES(messages[i], keys[i], encryptions[i]);
+            DecryptDES(encryptions[i], keys[i], decryptions[i]);
+        }
+        endTimeCPU[testCount] = clock();
 
-        ////// GPU-CPU encryption-decryption validation stage ////
-        //for (int i = 0; i < numMessages[testCount]; i++)
-        //{
-        //    bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
-        //    bEqualEncrypt &= (resultsEncryption[i] == encryptions[i]);
-        //}
+        //// GPU-CPU encryption-decryption validation stage ////
+        for (int i = 0; i < numMessages[testCount]; i++)
+        {
+            bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
+            bEqualEncrypt &= (resultsEncryption[i] == encryptions[i]);
+        }
     }
 
-    //if (!bEqualEncrypt)
-    //{
-    //    std::cout << "CPU-GPU Encryption comparison failed!\n";
-    //    return 0;
-    //}
-    //if (!bEqualDecrypt)
-    //{
-    //    std::cout << "Decryption-message comparison failed!\n";
-    //    return 0;
-    //}
+    if (!bEqualEncrypt)
+    {
+        std::cout << "CPU-GPU Encryption comparison failed!\n";
+        return 0;
+    }
+    if (!bEqualDecrypt)
+    {
+        std::cout << "Decryption-message comparison failed!\n";
+        return 0;
+    }
 
-    //if (bEqualDecrypt && bEqualEncrypt)
-    //{
-    //    std::cout << "Success!\n";
-    //}
+    if (bEqualDecrypt && bEqualEncrypt)
+    {
+        std::cout << "Success!\n";
+    }
 
     //// Runtime measurement and calculation stage ////
     // Calculate timings for CUDA, CPU execution. 
     // CUDA has 2 timing calculations: one with allocation time and one without. The reason is that the allocation time is very big, and impactful for small input data (where CPU performs better than the GPU).
-    //int CPUTime;
+    int CPUTime;
     int CUDATime, CUDATimeCopy, CUDATimeExecute;
     int CUDATimeAlloc = endTimeAlloc - startTimeAlloc;
     int CUDATimeCopyMatrices = endTimeCopyMatrices - startTimeCopyMatrices;
@@ -165,24 +165,24 @@ int main()
         CUDATimeExecute = endTimeExecute[i] - startTimeExecute[i];
         CUDATimeCopy = CUDATimeExecute + endTimeInputCopy[i] - startTimeInputCopy[i] + CUDATimeCopyMatrices;
         CUDATime = CUDATimeCopy+CUDATimeAlloc;
-        //CPUTime = endTimeCPU[i] - startTimeCPU[i];
+        CPUTime = endTimeCPU[i] - startTimeCPU[i];
         // printout of timing results
         std::cout << "Total messages size: " << (bytesMessages[i] >> 20) << " MegaBytes\n";
         std::cout << "Total timing measurements:\n";
         std::cout << "GPU - only kernel execution: " << CUDATimeExecute << "ms\n";
         std::cout << "GPU - with copying: " << CUDATimeCopy << "ms\n";
         std::cout << "GPU - with allocation and copying: " << CUDATime << "ms\n";
-        //std::cout << "CPU: " << CPUTime << "ms\n";
+        std::cout << "CPU: " << CPUTime << "ms\n";
 
         throughput = 1000.0f * (float)(bytesMessages[i] >> 17) / CUDATimeExecute;
-        //speedup = (float)CPUTime / CUDATime;
-        //speedupExecute = (float)CPUTime / CUDATimeExecute;
+        speedup = (float)CPUTime / CUDATime;
+        speedupExecute = (float)CPUTime / CUDATimeExecute;
         std::cout << "Speed measurements:\n";
         std::cout << "GPU - Execution speed: " << throughput << " MegaBits per second\n";
 
-        //std::cout << "Speedup measurements:\n";
-        //std::cout << "Speedup - Execution: " << speedupExecute << "\n";
-        //std::cout << "Speedup - with allocation and copy: " << speedup << "\n";
+        std::cout << "Speedup measurements:\n";
+        std::cout << "Speedup - Execution: " << speedupExecute << "\n";
+        std::cout << "Speedup - with allocation and copy: " << speedup << "\n";
         std::cout << "#" << i << " Done." << "\n\n";
     }
     //// Memory release stage ////
