@@ -106,8 +106,8 @@ int main()
         startTimeExecute[testCount] = clock();
         EncryptDESCuda << < numBlocks[testCount], numThreads>> > (d_messages, d_keys, d_matrices, d_SBoxes, d_resultsEncryption);
         cudaDeviceSynchronize(); // wait for encrypt to finish
-        DecryptDESCuda << <numBlocks[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_matrices, d_SBoxes, d_resultsDecryption);
-        cudaDeviceSynchronize();
+        //DecryptDESCuda << <numBlocks[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_matrices, d_SBoxes, d_resultsDecryption);
+        //cudaDeviceSynchronize();
         endTimeExecute[testCount] = clock();
         // cuda copy results 
         cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
