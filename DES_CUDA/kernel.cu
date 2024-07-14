@@ -19,7 +19,7 @@
 } 
 
 #define NUM_TESTS 9
-#define NUM_TESTS_QUICK 5
+#define NUM_TESTS_QUICK 4
 int main()
 {
     // kernel parameters
@@ -77,6 +77,10 @@ int main()
     int endTimeCopyMatrices = clock(); // Used to measure the time GPU finishes execution since copying started.
 
 
+    // verification parameters
+    bool bEqualDecrypt, bEqualEncrypt;
+    bEqualDecrypt = 1; bEqualEncrypt = 1;
+
     // timing parameters
     int startTimeInputCopy[NUM_TESTS]; int endTimeInputCopy[NUM_TESTS];
     int startTimeExecute[NUM_TESTS]; int endTimeExecute[NUM_TESTS];
@@ -101,8 +105,8 @@ int main()
         // We encrypt the messages using EncryptDESCuda. Then, we use all those encrypted messages to run DecryptDESCuda.
         startTimeExecute[testCount] = clock();
         EncryptDESCuda << < numBlocks[testCount], numThreads>> > (d_messages, d_keys, d_matrices, d_SBoxes, d_resultsEncryption);
-        //cudaDeviceSynchronize(); // wait for encrypt to finish
-        //DecryptDESCuda << <numBlocks, numThreads >> > (d_resultsEncryption, d_keys, d_matrices, d_SBoxes, d_resultsDecryption);
+        cudaDeviceSynchronize(); // wait for encrypt to finish
+        DecryptDESCuda << <numBlocks[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_matrices, d_SBoxes, d_resultsDecryption);
         cudaDeviceSynchronize();
         endTimeExecute[testCount] = clock();
         // cuda copy results 
@@ -125,6 +129,29 @@ int main()
             DecryptDES(encryptions[i], keys[i], decryptions[i]);
         }
         endTimeCPU[testCount] = clock();
+
+        //// GPU-CPU encryption-decryption validation stage ////
+        for (int i = 0; i < numMessages[testCount]; i++)
+        {
+            bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
+            bEqualEncrypt &= (resultsEncryption[i] == encryptions[i]);
+        }
+    }
+
+    if (!bEqualEncrypt)
+    {
+        std::cout << "CPU-GPU Encryption comparison failed!\n";
+        return 0;
+    }
+    if (!bEqualDecrypt)
+    {
+        std::cout << "Decryption-message comparison failed!\n";
+        return 0;
+    }
+
+    if (bEqualDecrypt && bEqualEncrypt)
+    {
+        std::cout << "Success!\n";
     }
 
     int CPUTime, CUDATime, CUDATimeCopy, CUDATimeExecute;
@@ -159,35 +186,6 @@ int main()
         std::cout << "Speedup - with allocation and copy: " << speedup << "\n";
         std::cout << "#" << i << " Done." << "\n\n";
     }
-
-
-
-
-
-    
-    //// GPU-CPU encryption-decryption validation stage ////
-    //bool bEqualDecrypt = 1; bool bEqualEncrypt = 1;
-    //for (int i = 0; i < numMessages; i++)
-    //{
-    //    bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
-    //    bEqualEncrypt &= (resultsEncryption[i] == encryptions[i]);
-    //}
-    //if (!bEqualDecrypt)
-    //{
-    //    std::cout << "Decryption-message comparison failed!\n";
-    //    return 0;
-    //}
-    //if (!bEqualEncrypt)
-    //{
-    //    std::cout << "CPU-GPU Encryption comparison failed!\n";
-    //    return 0;
-    //}
-
-    //if (bEqualDecrypt && bEqualEncrypt)
-    //{
-    //    std::cout << "Success!\n";
-    //}
-
     //// Memory release stage ////
 
     // CPU
