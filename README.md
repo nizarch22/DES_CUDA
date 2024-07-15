@@ -7,7 +7,7 @@ Run in release mode for fastest results.
 
 ## An array of random messages (1MB-256MB)
 Generates random messages generated from 1MB-256MB for plaintext alone, and outputs comparisons as printout.
-#### How to use:
+### How to use:
 Choose a mode by checking out to its branch. Available modes listed below.\
 Run in release mode.
 #### Available modes:
