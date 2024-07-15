@@ -16,7 +16,7 @@ Combinations worthy of looking at:\
 We get these modes by checking out to certain branches.
 Once finished, run in release mode.
 #### To vary the size of the array:
-Just change NUM_TESTS_QUICK in kernel.cu from 1-9 to determine a range mapped to 1MB-256MB.
+Change NUM_TESTS_QUICK in kernel.cu from 1-9 to determine a range mapped to 1MB,2MB,4MB,...,256MB. Set to 256MB by default. 
 
 ### 1. GPU and CPU
 Checkout branch ChangingSize.\
