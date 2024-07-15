@@ -15,7 +15,8 @@ Combinations worthy of looking at:\
 
 We get these modes by checking out to certain branches.
 Once finished, run in release mode.
-Note: Just change NUM_TESTS_QUICK from 1-9 to determine a range mapped to 1MB-256MB.
+#### To vary the size of the array:
+Just change NUM_TESTS_QUICK from 1-9 to determine a range mapped to 1MB-256MB.
 
 ### 1. GPU and CPU
 Checkout branch ChangingSize.\
