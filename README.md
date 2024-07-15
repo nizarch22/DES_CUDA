@@ -23,5 +23,5 @@ Checkout to the branch of the mode you are interested in. Branches are provided 
 
 Finally, run in release mode.
 #### To vary the size of the array:
-Change NUM_TESTS_QUICK in kernel.cu from 1-9 to determine a range mapped to 1MB,2MB,4MB,...,256MB. Set to 256MB by default.\
+Change NUM_TESTS_QUICK in kernel.cu from 1-9 to determine a range mapped to 1MB,2MB,4MB,...,256MB. Set to 256MB by default.
 
