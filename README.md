@@ -1,12 +1,12 @@
 ## Description
-Uses DES algorithm in CPU and GPU (CUDA) to make a comparison in runtime. The comparison is output as printout.
+Runs DES algorithm in CPU and GPU (CUDA) to make a comparison in runtime. The comparison is output as printout.
 ## How to use:
 Go to kernel.cu.\
 Change numMessages to whatever you want (messages and keys are randomly generated).\
 Run in release mode for fastest results.
 
 ## An array of random messages (1MB-256MB)
-Generates random messages generated from 1MB-256MB for plaintext alone, and outputs comparisons as prinout.\
+Generates random messages generated from 1MB-256MB for plaintext alone, and outputs comparisons as printout.
 #### Modes worthy of looking at:
 1. **Only GPU, only encryption** - to get accurate performance results from the CPU.
 2. **GPU and CPU, only encryption** - to compare accurate performance with CPU.
