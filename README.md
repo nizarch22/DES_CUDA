@@ -5,7 +5,7 @@ Go to kernel.cu.\
 Change numMessages to whatever you want (messages and keys are randomly generated).\
 Run in release mode for fastest results.
 ###### Important note
-Must have an Nvidia GPU in order to run this code, and of course must have a the CUDA framework installed from Nvidia's official website.
+Must have an Nvidia GPU with CUDA framework installed on the OS from Nvidia's official website in order to run this code.
 ## An array of random messages (1MB-256MB)
 Generates random messages generated from 1MB-256MB for plaintext alone, and outputs comparisons as printout.
 ### How to use:
