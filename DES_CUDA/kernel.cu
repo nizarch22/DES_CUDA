@@ -17,7 +17,7 @@
         exit(EXIT_FAILURE); \
     } \
 } 
-//
+
 int main()
 {
     // kernel parameters
