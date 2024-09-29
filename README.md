@@ -28,7 +28,6 @@ For example, 1 maps to 1MB, 3 maps to 4MB, 4 maps to 8MB, ..., 9 maps to 256MB.
 This number is defined as "NUM_TESTS_QUICK" in 'kernel.cu'.
 
 
-
 Note: A higher size will typically showcase a higher speedup as compared from CPU to GPU. This remains true as long as the GPU is not overburdened, but even then it is likely to outperform the CPU. 
 
 ### Available modes:
