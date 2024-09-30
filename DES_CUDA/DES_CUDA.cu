@@ -8,13 +8,14 @@ __device__ void generateReverseShiftedKeyCuda(const int& index, uint64_t& roundK
 __device__ void rightCircularShiftCuda(uint32_t& input, uint8_t times);
 __device__ void fullShiftLCSCuda(uint64_t& roundKey);
 __device__ void swapLRCuda(uint64_t& input); // Swap left (32 bit) and right (32 bit) parts of the 64 bit input.
-__device__ void substituteCuda(uint64_t& input, unsigned char* sboxes);
+__device__ void substituteCuda(uint64_t& input);
 __device__ void leftCircularShiftCuda(uint32_t& input, uint8_t times);
 __device__ void generateShiftedKeyCuda(const int& index, uint64_t& roundKey, unsigned char* cLCS);
 __device__ void permuteMatrixCuda(uint64_t& input, const unsigned char* P, const unsigned int size);
 
 __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* results)
 {
+	__shared__ unsigned char sharedInput[64];
 	int tid = threadIdx.x + blockIdx.x * blockDim.x;
 	uint64_t result; // setting alias for encryption
 
@@ -40,7 +41,12 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* res
 
 
 	// Initial operations 
-	permuteMatrixCuda(input, cIP, 64); //initialPermutation(input);
+	// uint64_t input to sharedInput array
+	sharedInput[tid] = (input >> tid) & 1;
+	__syncthreads();
+
+	// Initial permutation parallelized
+	permuteMatrixCuda(sharedInput, cIP, 64); //initialPermutation(input);
 	permuteMatrixCuda(shiftedKey, cPC1, 56); // PC1 of key
 
 	for (int i = 0; i < 16; i++)
@@ -64,13 +70,13 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* res
 		input ^= permutedRoundKey;
 
 		// Substitution S-boxes
-		substituteCuda(input, d_SBoxesConst); // 32 bits
+		substituteCuda(input); // 32 bits
 
 		// "P-matrix" permutation i.e. mix/shuffle
 		permuteMatrixCuda(input, cPMatrix, 32);// mixPermutation(input);
 
 		// XOR with preserved left side
-		result += left ^ input; // Result[31:0] = L XOR f[31:0];
+		result = left ^ input; // Result[31:0] = L XOR f[31:0];
 
 		// End of loop
 		input = result;
@@ -133,7 +139,7 @@ __global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, uint64_t* 
 		input ^= permutedRoundKey;
 
 		// Substitution S-boxes
-		substituteCuda(input, d_SBoxesConst); // 32 bits
+		substituteCuda(input); // 32 bits
 
 		// "P-matrix" permutation i.e. mix/shuffle
 		permuteMatrixCuda(input, cPMatrix, 32);// mixPermutation(input);
@@ -203,7 +209,7 @@ __global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, uint64_t* 
 //		input ^= permutedRoundKey;
 //
 //		// Substitution S-boxes
-//		substituteCuda(input, sboxes); // 32 bits
+//		substituteCuda(input); // 32 bits
 //
 //		// "P-matrix" permutation i.e. mix/shuffle
 //		permuteMatrixCuda(input, cPMatrix, 32);// mixPermutation(input);
@@ -276,7 +282,7 @@ __global__ void EncryptDESCudaDebug(uint64_t* messages, uint64_t* keys, unsigned
 		input ^= permutedRoundKey;
 		debug[6 + tid * n] = input;
 		// Substitution S-boxes
-		substituteCuda(input, sboxes); // 32 bits
+		substituteCuda(input); // 32 bits
 		debug[7 + tid * n] = input;
 
 		// "P-matrix" permutation i.e. mix/shuffle
@@ -299,16 +305,13 @@ __global__ void EncryptDESCudaDebug(uint64_t* messages, uint64_t* keys, unsigned
 	debug[11 + tid * n] = messages[tid];
 }
 
-__device__ void permuteMatrixCuda(uint64_t& input, const unsigned char* P, const unsigned int size)
+__device__ void permuteMatrixCuda(unsigned char* input, const unsigned char* P)
 {
 	uint64_t output = 0;
 	uint64_t bit;
-
-	for (int i = 0; i < size; i++)
-	{
-		bit = (input >> (P[i] - 1)) & 1;
-		output += bit << i;
-	}
+	
+	bit = (input >> (P[tid] - 1)) & 1;
+	output += bit << tid;
 	input = output;
 }
 __device__ void generateShiftedKeyCuda(const int& index, uint64_t& roundKey, unsigned char* cLCS)
@@ -382,7 +385,7 @@ __device__ void rightCircularShiftCuda(uint32_t& input, uint8_t times)
 	input = input & mask28Bits;
 }
 
-__device__ void substituteCuda(uint64_t& input, unsigned char* sboxes)
+__device__ void substituteCuda(uint64_t& input)
 {
 	uint64_t result = 0; uint64_t temp;
 	uint8_t y, x;
@@ -402,7 +405,7 @@ __device__ void substituteCuda(uint64_t& input, unsigned char* sboxes)
 		y += in & maskY1;
 
 		// Substitution 
-		temp = sboxes[i*64+y*16+x];
+		temp = d_SBoxesConst[i*64+y*16+x];
 		result += temp << (4 * i);
 
 		// next bits
