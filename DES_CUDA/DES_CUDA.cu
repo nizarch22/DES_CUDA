@@ -13,7 +13,77 @@ __device__ void leftCircularShiftCuda(uint32_t& input, uint8_t times);
 __device__ void generateShiftedKeyCuda(const int& index, uint64_t& roundKey, unsigned char* cLCS);
 __device__ void permuteMatrixCuda(uint64_t& input, const unsigned char* P, const unsigned int size);
 
-__global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char* matrices, unsigned char* sboxes, uint64_t* results)
+
+//__global__ void EncryptDESCudaBlock(const uint64_t& message, const uint64_t& key, unsigned char* matrices, unsigned char* sboxes, uint64_t* result)
+//{
+//	int tid = threadIdx.x + blockIdx.x * blockDim.x;
+//	uint64_t result; // setting alias for encryption
+//
+//	uint64_t input = message;
+//	uint64_t shiftedKey = key;
+//	uint64_t permutedRoundKey;
+//	uint64_t left; // last 32 bits of plaintext/input to algorithm are preserved in this variable 
+//
+//	// load matrices
+//	// essential variables
+//	unsigned char* cIP, * cPC1, * cPC2, * cE, * cPMatrix, * cIPInverse, * cLCS;
+//	int matricesSizes[7] = { 64,56,48,48,32,64,16 };
+//
+//	// loading matrices process
+//	unsigned char* temp = matrices;
+//	cIP = temp; temp += matricesSizes[0];
+//	cPC1 = temp; temp += matricesSizes[1];
+//	cPC2 = temp; temp += matricesSizes[2];
+//	cE = temp; temp += matricesSizes[3];
+//	cPMatrix = temp; temp += matricesSizes[4];
+//	cIPInverse = temp; temp += matricesSizes[5];
+//	cLCS = temp;
+//
+//
+//	// Initial operations 
+//	permuteMatrixCuda(input, cIP, 64); //initialPermutation(input);
+//	permuteMatrixCuda(shiftedKey, cPC1, 56); // PC1 of key
+//
+//	for (int i = 0; i < 16; i++)
+//	{
+//		// Preserving L,R.
+//		// preserve right side (Result[63:32] = Input[31:0])
+//		result = input;
+//		result <<= 32;
+//		// preserve left side
+//		left = input >> 32;
+//
+//		// Round key
+//		generateShiftedKeyCuda(i, shiftedKey, cLCS);
+//		permutedRoundKey = shiftedKey;
+//		permuteMatrixCuda(permutedRoundKey, cPC2, 48);//roundKeyPermutation(permutedRoundKey);
+//
+//		// Expansion permutation
+//		permuteMatrixCuda(input, cE, 48);//expandPermutation(input); // 48 bits
+//
+//		// XOR with permuted round key
+//		input ^= permutedRoundKey;
+//
+//		// Substitution S-boxes
+//		substituteCuda(input, sboxes); // 32 bits
+//
+//		// "P-matrix" permutation i.e. mix/shuffle
+//		permuteMatrixCuda(input, cPMatrix, 32);// mixPermutation(input);
+//
+//		// XOR with preserved left side
+//		result += left ^ input; // Result[31:0] = L XOR f[31:0];
+//
+//		// End of loop
+//		input = result;
+//	}
+//
+//	swapLRCuda(result);
+//	permuteMatrixCuda(result, cIPInverse, 64);//reverseInitialPermutation(result);
+//	results[tid] = result;
+//}
+
+
+__global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* results)
 {
 	int tid = threadIdx.x + blockIdx.x * blockDim.x;
 	uint64_t result; // setting alias for encryption
@@ -29,7 +99,7 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char
 	int matricesSizes[7] = { 64,56,48,48,32,64,16 };
 
 	// loading matrices process
-	unsigned char* temp = matrices;
+	unsigned char* temp = d_matricesConst;
 	cIP = temp; temp += matricesSizes[0];
 	cPC1 = temp; temp += matricesSizes[1];
 	cPC2 = temp; temp += matricesSizes[2];
@@ -64,7 +134,7 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char
 		input ^= permutedRoundKey;
 
 		// Substitution S-boxes
-		substituteCuda(input,sboxes); // 32 bits
+		substituteCuda(input, d_SBoxesConst); // 32 bits
 
 		// "P-matrix" permutation i.e. mix/shuffle
 		permuteMatrixCuda(input, cPMatrix, 32);// mixPermutation(input);
@@ -80,7 +150,7 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, unsigned char
 	permuteMatrixCuda(result, cIPInverse, 64);//reverseInitialPermutation(result);
 	results[tid] = result;
 }
-__global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, unsigned char* matrices, unsigned char* sboxes, uint64_t* results)
+__global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, uint64_t* results)
 {
 	int tid = threadIdx.x + blockIdx.x * blockDim.x;
 	uint64_t result; // setting alias for decryption
@@ -96,7 +166,7 @@ __global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, unsigned c
 	int matricesSizes[7] = { 64,56,48,48,32,64,16 };
 
 	// loading matrices process
-	unsigned char* temp = matrices;
+	unsigned char* temp = d_matricesConst;
 	cIP = temp; temp += matricesSizes[0];
 	cPC1 = temp; temp += matricesSizes[1];
 	cPC2 = temp; temp += matricesSizes[2];
@@ -133,7 +203,7 @@ __global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, unsigned c
 		input ^= permutedRoundKey;
 
 		// Substitution S-boxes
-		substituteCuda(input, sboxes); // 32 bits
+		substituteCuda(input, d_SBoxesConst); // 32 bits
 
 		// "P-matrix" permutation i.e. mix/shuffle
 		permuteMatrixCuda(input, cPMatrix, 32);// mixPermutation(input);
