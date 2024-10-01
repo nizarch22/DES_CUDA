@@ -11,18 +11,24 @@ __device__ void swapLRCuda(uint64_t& input); // Swap left (32 bit) and right (32
 __device__ void substituteCuda(uint64_t& input);
 __device__ void leftCircularShiftCuda(uint32_t& input, uint8_t times);
 __device__ void generateShiftedKeyCuda(const int& index, uint64_t& roundKey, unsigned char* cLCS);
-__device__ void permuteMatrixCuda(uint64_t& input, const unsigned char* P, const unsigned int size);
+__device__ void permuteMatrixCuda(unsigned char* input, const unsigned char* P, const unsigned int size);
 
 __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* results)
 {
+	// figure out whether to use 64 or 64,56,48, etc.
 	__shared__ unsigned char sharedInput[64];
+	__shared__ unsigned char sharedLeft[64];
+	__shared__ unsigned char sharedResult[64];
+	__shared__ unsigned char sharedKey[64];
+	__shared__ unsigned char sharedRoundkey[64];
+
 	int tid = threadIdx.x + blockIdx.x * blockDim.x;
 	uint64_t result; // setting alias for encryption
 
-	uint64_t input = messages[tid];
-	uint64_t shiftedKey = keys[tid];
-	uint64_t permutedRoundKey;
-	uint64_t left; // last 32 bits of plaintext/input to algorithm are preserved in this variable 
+	__shared__ uint64_t input = messages[blockIdx.x];
+	__shared__ uint64_t shiftedKey = keys[blockIdx.x];
+	__shared__ uint64_t permutedRoundKey;
+	__shared__ uint64_t left; // last 32 bits of plaintext/input to algorithm are preserved in this variable 
 
 	// load matrices
 	// essential variables
@@ -41,33 +47,42 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* res
 
 
 	// Initial operations 
-	// uint64_t input to sharedInput array
-	sharedInput[tid] = (input >> tid) & 1;
+	// The 64 bits of message,key (uint64_t) are converted into 64 bytes (unsigned char) so that they are easily parallelizable. 
+	sharedInput[threadIdx.x] = (input >> threadIdx.x) & 1;
+	sharedKey[threadIdx.x] = (shiftedKey >> threadIdx.x) & 1;
 	__syncthreads();
 
 	// Initial permutation parallelized
 	permuteMatrixCuda(sharedInput, cIP, 64); //initialPermutation(input);
-	permuteMatrixCuda(shiftedKey, cPC1, 56); // PC1 of key
+	permuteMatrixCuda(sharedKey, cPC1, 56); // PC1 of key
 
 	for (int i = 0; i < 16; i++)
 	{
 		// Preserving L,R.
-		// preserve right side (Result[63:32] = Input[31:0])
-		result = input;
-		result <<= 32;
-		// preserve left side
-		left = input >> 32;
+		// preserve right side, R. (Result[63:32] = Input[31:0])
+		sharedResult[threadIdx.x] = sharedInput[threadIdx.x];
 
+		// preserve left side, L.
+		sharedLeft[threadIdx.x] = sharedInput[threadIdx.x];
+		__syncthreads();
+		//left = input >> 32;
+		
 		// Round key
-		generateShiftedKeyCuda(i, shiftedKey, cLCS);
-		permutedRoundKey = shiftedKey;
-		permuteMatrixCuda(permutedRoundKey, cPC2, 48);//roundKeyPermutation(permutedRoundKey);
+		generateShiftedKeyCuda(i, sharedKey, cLCS);
+		
+		// preserve the current shifted key (sharedKey) for the next iteration.
+		sharedRoundkey[threadIdx.x] = sharedKey[threadIdx.x];
+		__syncthreads();
 
-		// Expansion permutation
-		permuteMatrixCuda(input, cE, 48);//expandPermutation(input); // 48 bits
+		// Permutation PC2 of the roundKey
+		permuteMatrixCuda(sharedRoundkey, cPC2, 48);//roundKeyPermutation(permutedRoundKey);
+
+		// Expansion permutation of input's right side (R).
+		permuteMatrixCuda(sharedInput, cE, 48);//expandPermutation(input); // 48 bits
 
 		// XOR with permuted round key
-		input ^= permutedRoundKey;
+		sharedInput[threadIdx.x] = sharedInput[threadIdx.x] ^ sharedRoundkey[threadIdx.x];
+		__syncthreads();
 
 		// Substitution S-boxes
 		substituteCuda(input); // 32 bits
@@ -76,7 +91,7 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* res
 		permuteMatrixCuda(input, cPMatrix, 32);// mixPermutation(input);
 
 		// XOR with preserved left side
-		result = left ^ input; // Result[31:0] = L XOR f[31:0];
+		result += left ^ input; // Result[31:0] = L XOR f[31:0];
 
 		// End of loop
 		input = result;
@@ -239,7 +254,7 @@ __global__ void EncryptDESCudaDebug(uint64_t* messages, uint64_t* keys, unsigned
 	
 	// load matrices
 	// essential variables
-	unsigned char* cIP, * cPC1, * cPC2, * cE, * cPMatrix, * cIPInverse, * cLCS;
+	__shared__ unsigned char* cIP, * cPC1, * cPC2, * cE, * cPMatrix, * cIPInverse, * cLCS;
 	int matricesSizes[7] = { 64,56,48,48,32,64,16 };
 
 	// loading matrices process
@@ -305,34 +320,22 @@ __global__ void EncryptDESCudaDebug(uint64_t* messages, uint64_t* keys, unsigned
 	debug[11 + tid * n] = messages[tid];
 }
 
-__device__ void permuteMatrixCuda(unsigned char* input, const unsigned char* P)
+__device__ void permuteMatrixCuda(unsigned char* input, const unsigned char* P, unsigned int size)
 {
-	uint64_t output = 0;
-	uint64_t bit;
-	
-	bit = (input >> (P[tid] - 1)) & 1;
-	output += bit << tid;
-	input = output;
+	// Figure out how to not make warps here.
+	unsigned char bit;
+	if (threadIdx.x >= size)
+		goto PERMUTE_FUNC_END;
+	bit = input[P[threadIdx.x] - 1] & 1;
+	__syncthreads();
+	input[threadIdx.x] = bit;
+PERMUTE_FUNC_END:
+	__syncthreads();
 }
-__device__ void generateShiftedKeyCuda(const int& index, uint64_t& roundKey, unsigned char* cLCS)
+__device__ void generateShiftedKeyCuda(const int& index, unsigned char* roundKey, unsigned char* cLCS)
 {
-	uint32_t left, right;
-	uint64_t mask28Bits = 268435455; // covers first 28 bits
-
-	// getting left and right sides
-	right = roundKey & mask28Bits;
-	mask28Bits <<= 28;
-	mask28Bits = roundKey & mask28Bits;
-	left = mask28Bits >> 28;
-
 	// circular shifts
-	leftCircularShiftCuda(left, cLCS[index]);
-	leftCircularShiftCuda(right, cLCS[index]);
-
-	// copying left and right shifted keys to roundKey.
-	roundKey = left;
-	roundKey <<= 28;
-	roundKey += right;
+	leftCircularShiftCuda(roundKey, cLCS[index]);
 }
 __device__ void generateReverseShiftedKeyCuda(const int& index, uint64_t& roundKey, unsigned char* cLCS)
 {
@@ -354,19 +357,26 @@ __device__ void generateReverseShiftedKeyCuda(const int& index, uint64_t& roundK
 	roundKey <<= 28;
 	roundKey += right;
 }
-__device__ void leftCircularShiftCuda(uint32_t& input, uint8_t times)
+__device__ void leftCircularShiftCuda(unsigned char* input, uint8_t times)
 {
-	uint32_t mask28thBit = 1 << 27; // 28th bit
-	uint32_t mask28Bits = 268435455; // covers first 28 bits
+	__shared__ unsigned char sharedKeyCopy[64];
 
-	uint8_t bit;
-	for (int i = 0; i < times; i++)
-	{
-		bit = (input & mask28thBit) >> 27;
-		input <<= 1;
-		input += bit;
-	}
-	input = input & mask28Bits;
+	// copying the key
+	sharedKeyCopy[threadIdx.x] = input[threadIdx.x];
+	__syncthreads();
+
+	// set offset to determine left and right (L,R) sides of key.
+	int offset = 28 * (threadIdx.x / 28);
+
+	int index = offset + (threadIdx.x + times) % 28;
+
+	// accounting for edge case with 64 bits.
+	// Note shifting is not necessary here, as we do not care about the last 8 bits. 
+	index = (index >= 56) ? (offset+index%8): index;
+
+	// Finally applying the shift
+	input[index] = sharedKeyCopy[threadIdx.x];
+	__syncthreads();
 }
 
 __device__ void rightCircularShiftCuda(uint32_t& input, uint8_t times)
@@ -387,6 +397,11 @@ __device__ void rightCircularShiftCuda(uint32_t& input, uint8_t times)
 
 __device__ void substituteCuda(uint64_t& input)
 {
+	// Try to not warp
+	if (threadIdx.x >= 32)
+		goto SUB_FUNC_END;
+
+
 	uint64_t result = 0; uint64_t temp;
 	uint8_t y, x;
 	uint8_t in;
@@ -401,7 +416,7 @@ __device__ void substituteCuda(uint64_t& input)
 		// getting x,y coordinates for Sbox
 		in = input & mask;
 		x = (in & maskX) >> 1;
-		y = (in & maskY2) >> 4;
+		y = (in & maskY2) >> 5;
 		y += in & maskY1;
 
 		// Substitution 
@@ -412,6 +427,9 @@ __device__ void substituteCuda(uint64_t& input)
 		input >>= 6;
 	}
 	input = result;
+
+SUB_FUNC_END:
+	__syncthreads();
 }
 __device__ void swapLRCuda(uint64_t& input) // Swap left (32 bit) and right (32 bit) parts of the 64 bit input.
 {
