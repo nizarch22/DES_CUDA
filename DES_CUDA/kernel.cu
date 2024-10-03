@@ -17,7 +17,7 @@
         exit(EXIT_FAILURE); \
     } \
 } 
-#define DEBUG_ITERATION 0
+#define DEBUG_ITERATION -1
 #define NUM_TESTS 9
 #define NUM_TESTS_QUICK 4
 int main()
@@ -81,144 +81,155 @@ int main()
         endTimeInputCopy[testCount] = clock();
 
         //Debug - delete later
-        unsigned char debug[64000];
-        uint64_t debugInt[101];
-        debugInt[100] = DEBUG_ITERATION;
+        unsigned char debug[9450];
+        uint64_t debugInt[150];
+        debugInt[149] = DEBUG_ITERATION;
         unsigned char* d_debug;
         uint64_t* d_debugInt;
-        cudaMalloc(&d_debug, 6400);
-        cudaMalloc(&d_debugInt, 64*8);
+        cudaMalloc(&d_debug, 9450);
+        cudaMalloc(&d_debugInt, 1200);
+        cudaMemcpy(d_debugInt, debugInt, 1200, cudaMemcpyHostToDevice);
 
-        debugFoo << < 1, 64 >> > (d_messages, d_keys, d_resultsEncryption, d_debug, d_debugInt);
+        debugFoo << < 200, 64 >> > (d_messages, d_keys, d_resultsEncryption, d_debug, d_debugInt);
         cudaDeviceSynchronize(); // wait for encrypt to finish
-        cudaMemcpy(&debugInt[0], d_debugInt, 101*8,cudaMemcpyDeviceToHost);
-        cudaMemcpy(&debug[0], d_debug, 6400,cudaMemcpyDeviceToHost);
+        cudaMemcpy(&debugInt[0], d_debugInt, 1200,cudaMemcpyDeviceToHost);
+        cudaMemcpy(&debug[0], d_debug, 9450,cudaMemcpyDeviceToHost);
+        cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
         cudaDeviceSynchronize(); // wait for encrypt to finish
 
-        std::cout << "Messages:\n";
-        std::cout << (messages[0]) << "\n";
-        std::cout << (debugInt[0]) << "\n";
-
-        std::cout << "Keys:\n";
-        std::cout << (keys[0]) << "\n";
-        std::cout << (debugInt[1]) << "\n";
-        
-
-
-        //uint64_t roundkey, left, result;
-
-        //uint64_t key = keys[0]; 
-        //uint64_t msg = messages[0]; 
-
+        //uint64_t temp;
+        //uint64_t debugCPU[150];
+        //uint64_t debugGPU[150];
+        //for (int i = 0; i <= 100; i++)
+        //{
+        //    uint64_t word = 0;
+        //    for (int j = 0; j < 64; j++)
+        //    {
+        //        word <<= 1;
+        //        word += debug[i * 64 + 63-j];
+        //    }
+        //    debugGPU[i] = word;
+        //}
+        //debugCPU[149] = DEBUG_ITERATION;
+        //EncryptDESDebug(messages[0], keys[0], temp, debugCPU);
         //int size = 64;
-        //
-        //// key
-        //permuteMatrix(key, PC1, 56);
-        //
-        //// key shifts
-        //generateShiftedKey(1, key);
-        //
-        //// roundkey permutation PC2
-        //roundkey = key;
-        //permuteMatrix(roundkey, PC2, 48);
+        //// first 3 checks
+        //for (int i = 0; i < 2; i++)
+        //{
+        //    if (debugCPU[i]!=debugGPU[i])
+        //    {
+        //        std::cout << "Mistmatch occured. Round: " << i % 6 << "\n";
+        //        std::cout << debugCPU[i] << " != " << debugGPU[i] << "\n";
+        //        return -1;
+        //    }
+        //}
+        //for (int i = 3; i <= 98; i++)
+        //{
+        //    if (debugCPU[i] != debugGPU[i])
+        //    {
+        //        std::cout << "Mistmatch occured. Iteration: " << (i - 3) / 6 << ", Index: " << 3+(i-3)%6 << "\n";
+        //        std::cout << debugCPU[i] << " != " << debugGPU[i] << "\n";
+        //        for (int j = 0; j < 64; j++)
+        //        {
+        //            std::cout << (int)(debug[i*64+j]) << ",";
+        //        }
+        //        std::cout << "\n";
+        //        uint64_t mismatchedWord = debugCPU[i];
+        //        for (int j = 0; j < 64; j++)
+        //        {
+        //            std::cout << (mismatchedWord&1) << ",";
+        //            mismatchedWord >>= 1;
+        //        }
+        //        std::cout << "\n";
 
-        ////input
-        //permuteMatrix(msg, IP, 64);
+        //        std::cout << "results from sboxout\n";
+        //        for (int i = 0; i < 8; i++)
+        //        {
+        //            std::cout << debugInt[i] << ",";
+        //        }
+        //        std::cout << "\n";
+        //        for (int i = 0; i < 8; i++)
+        //        {
+        //            std::cout << debugCPU[101+i] << ",";
+        //        }
+        //        std::cout << "\n";
 
-        ////preserve left and right
-        //left = msg;
-        //left >>= 32;
-        //// right
-        //result = msg;
-        //result <<= 32;
-        ////permute
-        //permuteMatrix(msg, E, 48);
+        //        std::cout << "subcuda - x\n";
+        //        for (int i = 0; i < 8; i++)
+        //        {
+        //            std::cout << debugInt[i+8] << ",";
+        //        }
+        //        std::cout << "\n";
+        //        for (int i = 0; i < 8; i++)
+        //        {
+        //            std::cout << debugCPU[101 + i +8] << ",";
+        //        }
+        //        std::cout << "\n";
 
-        //msg ^= roundkey;
+        //        std::cout << "subcuda - y\n";
+        //        for (int i = 0; i < 8; i++)
+        //        {
+        //            std::cout << debugInt[i +16] << ",";
+        //        }
+        //        std::cout << "\n";
+        //        for (int i = 0; i < 8; i++)
+        //        {
+        //            std::cout << debugCPU[101 + i +16] << ",";
+        //        }
+        //        std::cout << "\n";
+        //        return -1;
+        //    }
+        //}
+        //for (int i = 99; i <= 100; i++)
+        //{
+        //    if (debugCPU[i] != debugGPU[i])
+        //    {
+        //        std::cout << "Ending mismatch occured. Index: " << i << "\n";
+        //        std::cout << debugCPU[i] << " != " << debugGPU[i] << "\n";
 
-        //substitute(msg);
+        //        for (int j = 0; j < 64; j++)
+        //        {
+        //            std::cout << (int)(debug[i * 64 + j]) << ",";
+        //        }
+        //        std::cout << "\n";
+        //        uint64_t mismatchedWord = debugCPU[i];
+        //        for (int j = 0; j < 64; j++)
+        //        {
+        //            std::cout << (mismatchedWord & 1) << ",";
+        //            mismatchedWord >>= 1;
+        //        }
+        //        return -1;
+        //    }
 
-        //permuteMatrix(msg, PMatrix, 32);
 
-        //msg <<= 32;
-        //msg >>= 32;
-        //result += msg^left;
-        //uint64_t temp = result;
+        //}
         uint64_t temp;
-        uint64_t debugCPU[101];
-        uint64_t debugGPU[101];
-        for (int i = 0; i <= 100; i++)
-        {
-            uint64_t word = 0;
-            for (int j = 0; j < 64; j++)
-            {
-                word <<= 1;
-                word += debug[i * 64 + 63-j];
-            }
-            debugGPU[i] = word;
-        }
-        debugCPU[100] = DEBUG_ITERATION;
-        EncryptDESDebug(messages[0], keys[0], temp, debugCPU);
-        int size = 64;
-        // first 3 checks
-        for (int i = 0; i < 2; i++)
-        {
-            if (debugCPU[i]!=debugGPU[i])
-            {
-                std::cout << "Mistmatch occured. Round: " << i % 6 << "\n";
-                std::cout << debugCPU[i] << " != " << debugGPU[i] << "\n";
-                return -1;
-            }
-        }
-        for (int i = 3; i <= 98; i++)
-        {
-            if (debugCPU[i] != debugGPU[i])
-            {
-                std::cout << "Mistmatch occured. Iteration: " << (i - 3) / 6 << ", Index: " << 3+(i-3)%6 << "\n";
-                std::cout << debugCPU[i] << " != " << debugGPU[i] << "\n";
-                for (int j = 0; j < 64; j++)
-                {
-                    std::cout << (int)(debug[i*64+j]) << ",";
-                }
-                std::cout << "\n";
-                uint64_t mismatchedWord = debugCPU[i];
-                for (int j = 0; j < 64; j++)
-                {
-                    std::cout << (mismatchedWord&1) << ",";
-                    mismatchedWord >>= 1;
-                }
-                std::cout << "\n";
+        uint64_t debugCPU[150]; debugCPU[149] = -1;
 
-                std::cout << "results from sboxout\n";
-                for (int i = 0; i < 8; i++)
-                {
-                    std::cout << debugInt[i] << ",";
-                }
-                std::cout << "\n";
-                for (int i = 0; i < 8; i++)
-                {
-                    std::cout << debugCPU[40+i] << ",";
-                }
-                std::cout << "\n";
-                return -1;
-            }
-        }
-        if (debugInt[2+5] == temp)
+        for (int i = 0; i < 600; i++)
         {
-            std::cout << "match!\n";
-        }
-        for (int i = 0; i < 32; i++)
-        {
-            unsigned char bit = temp & 1;
-            std::cout << (int)bit << " = " << (int)debug[i] << "\n";
-            if (bit != (debug[i]))
+            //EncryptDESDebug(messages[i], keys[i], temp, debugCPU);
+            EncryptDES(messages[i], keys[i], temp);
+            if (temp != resultsEncryption[i])
             {
-                std::cout << "bit mismatch!\n";
+                std::cout << "Ending mismatch occured. Index: " << i << "\n";
+                std::cout << temp << " != " << resultsEncryption[i] << "\n";
+
+                cudaMemcpy(d_messages, &messages[i], 64, cudaMemcpyHostToDevice);
+                cudaMemcpy(d_keys, &keys[i], 64, cudaMemcpyHostToDevice);
+
+                debugFoo << < 1, 64 >> > (d_messages, d_keys, d_resultsEncryption, d_debug, d_debugInt);
+                cudaDeviceSynchronize(); // wait for encrypt to finish
+                cudaMemcpy(resultsEncryption, d_resultsEncryption, 64, cudaMemcpyDeviceToHost);
+                cudaDeviceSynchronize(); // wait for encrypt to finish
+
+                std::cout << "Singular attempt - matching check: " << i << "\n";
+                std::cout << temp << " =?= " << resultsEncryption[0] << "\n";
+                std::cout << "Result: " << ((temp == resultsEncryption[0]) ? "Success" : "Fail") << "\n";
                 return -1;
             }
-            temp >>= 1;
         }
-
+        std::cout << "Success! All debugging parameters match!\n";
         return 0;
         //// Run Encryption & Decryption in CUDA stage ////
         // We encrypt the messages using EncryptDESCuda. Then, we use all those encrypted messages to run DecryptDESCuda.

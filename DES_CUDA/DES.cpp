@@ -257,12 +257,6 @@ void EncryptDES(const uint64_t& plaintext, const uint64_t& key, uint64_t& encryp
 
 		// End of loop
 		input = result;
-
-		if (i == 0)
-		{
-			encryption = input;
-			return;
-		}
 	}
 
 	swapLR(result);
@@ -292,9 +286,9 @@ void substituteDebug(uint64_t& input, uint64_t* debug)
 		temp = SBoxes[i][(y * 16) + x];
 
 		// debug code
-		debug[40 + i] = temp;
-		debug[40 + i +8] = x;
-		debug[40 + i +16] = y;
+		debug[101 + i] = temp;
+		debug[101 + i +8] = x;
+		debug[101 + i +16] = y;
 
 		result += temp << (4 * i);
 
@@ -344,12 +338,8 @@ void EncryptDESDebug(const uint64_t& plaintext, const uint64_t& key, uint64_t& e
 		debug[6+i * 6] = input;
 
 		// Substitution S-boxes
-		substituteDebug(input, debug); // 32 bits
+		substitute(input); // 32 bits
 		debug[7+i * 6] = input;
-		if (i == debug[100])
-		{
-			return;
-		}
 		// "P-matrix" permutation i.e. mix/shuffle
 		mixPermutation(input);
 		debug[8+i * 6] = input;

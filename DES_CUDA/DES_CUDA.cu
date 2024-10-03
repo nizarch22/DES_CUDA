@@ -7,14 +7,12 @@
 // Primary header is compatible with pre-C++11, collective algorithm headers require C++11
 #include <cooperative_groups.h>
 using namespace cooperative_groups;
-__device__ void swapLRCuda(unsigned char* input); // Swap left (32 bit) and right (32 bit) parts of the 64 bit input.
-__device__ void substituteCuda(unsigned char* input);
-__device__ void substituteCudaDebug(unsigned char* input, unsigned char* debug, uint64_t* debugInt);
-__device__ void leftCircularShiftCuda(unsigned char* input, uint8_t times);
-__device__ void rightCircularShiftCuda(unsigned char* input, uint8_t times);
-__device__ void generateShiftedKeyCuda(const int& index, unsigned char* roundKey);
-__device__ void generateReverseShiftedKeyCuda(const int& index, unsigned char* roundKey);
-__device__ void permuteMatrixCuda(unsigned char* input, const unsigned char* P, const unsigned int size);
+__device__ void swapLRCuda(unsigned char* input, unsigned char* sharedCopy); // Swap left (32 bit) and right (32 bit) parts of the 64 bit input.
+__device__ void substituteCuda(unsigned char* input, uint16_t* sharedX, uint16_t* sharedY, unsigned char* sharedOutput);
+__device__ void substituteCudaDebug(unsigned char* input, uint16_t* sharedX, uint16_t* sharedY, unsigned char* sharedOutput, unsigned char* debug, uint64_t* debugInt);
+__device__ void leftCircularShiftCuda(unsigned char* input, unsigned char* sharedCopy, uint8_t times);
+__device__ void rightCircularShiftCuda(unsigned char* input, unsigned char* sharedCopy, uint8_t times);
+__device__ void permuteMatrixCuda(unsigned char* input, unsigned char* sharedCopy, const unsigned char* P, const unsigned int size);
 
 
 __device__ void copy(unsigned char* debug, unsigned char* target, int num)
@@ -24,12 +22,20 @@ __device__ void copy(unsigned char* debug, unsigned char* target, int num)
 }
 __global__ void debugFoo(uint64_t* messages, uint64_t* keys, uint64_t* results, unsigned char* debug, uint64_t* debugInt)
 {
+	// Kernel iterations shared memory
 	__shared__ unsigned char sharedInput[64];
 	__shared__ unsigned char sharedLeft[64];
 	__shared__ unsigned char sharedResult[64];
 	__shared__ unsigned char sharedKey[64];
 	__shared__ unsigned char sharedRoundkey[64];
 	__shared__ uint64_t result; // setting alias for encryption
+
+	// General shared array for copying input. Used in the following functions: permuteMatrixCuda, swapLRCuda, leftCircularShiftCuda, rightCircularShiftCuda
+	__shared__ unsigned char sharedCopy[64];
+	// Special arrays for 'subsituteCuda' function:
+	__shared__ uint16_t sharedX[8];
+	__shared__ uint16_t sharedY[8];
+	__shared__ unsigned char sharedOutput[8];
 
 	uint64_t input;
 	uint64_t shiftedKey;
@@ -53,8 +59,8 @@ __global__ void debugFoo(uint64_t* messages, uint64_t* keys, uint64_t* results, 
 	copy(debug, sharedKey, 1);
 
 	// Initial permutation parallelized
-	permuteMatrixCuda(sharedInput, d_IPConst, 64); //initialPermutation(input);
-	permuteMatrixCuda(sharedKey, d_PC1Const, 56); // PC1 of key
+	permuteMatrixCuda(sharedInput, sharedCopy, d_IPConst, 64); //initialPermutation(input);
+	permuteMatrixCuda(sharedKey, sharedCopy, d_PC1Const, 56); // PC1 of key
 
 	copy(debug, sharedInput, 0);
 	copy(debug, sharedKey, 2);
@@ -72,7 +78,7 @@ __global__ void debugFoo(uint64_t* messages, uint64_t* keys, uint64_t* results, 
 
 
 		// Round key
-		generateShiftedKeyCuda(i, sharedKey);
+		leftCircularShiftCuda(sharedKey, sharedCopy, i);
 
 		copy(debug, sharedKey, 3+i*6);
 
@@ -83,12 +89,12 @@ __global__ void debugFoo(uint64_t* messages, uint64_t* keys, uint64_t* results, 
 
 
 		// Permutation PC2 of the roundKey
-		permuteMatrixCuda(sharedRoundkey, d_PC2Const, 48);//roundKeyPermutation(permutedRoundKey);
+		permuteMatrixCuda(sharedRoundkey, sharedCopy, d_PC2Const, 48);//roundKeyPermutation(permutedRoundKey);
 
 		copy(debug, sharedRoundkey, 4 + i * 6);
 
 		// Expansion permutation of input's right side (R).
-		permuteMatrixCuda(sharedInput, d_EConst, 48);//expandPermutation(input); // 48 bits
+		permuteMatrixCuda(sharedInput, sharedCopy, d_EConst, 48);//expandPermutation(input); // 48 bits
 
 		copy(debug, sharedInput, 5 + i * 6);
 
@@ -104,12 +110,13 @@ __global__ void debugFoo(uint64_t* messages, uint64_t* keys, uint64_t* results, 
 
 		copy(debug, sharedInput, 7 + i * 6);
 
-		if (debugInt[100] == i)
+		if (debugInt[149] == i)
 		{
+			__syncthreads();
 			return;
 		}
 		// "P-matrix" permutation i.e. mix/shuffle
-		permuteMatrixCuda(sharedInput, d_PMatrixConst, 32);// mixPermutation(input);
+		permuteMatrixCuda(sharedInput, sharedCopy, d_PMatrixConst, 32);// mixPermutation(input);
 
 		copy(debug, sharedInput, 8 + i * 6);
 
@@ -131,24 +138,22 @@ __global__ void debugFoo(uint64_t* messages, uint64_t* keys, uint64_t* results, 
 
 	}
 
-	swapLRCuda(sharedResult);
-	copy(debug, sharedInput, 99);
+	swapLRCuda(sharedResult sharedCopy);
+	copy(debug, sharedResult, 99);
 
-	permuteMatrixCuda(sharedResult, d_IPInverseConst, 64);//reverseInitialPermutation(result);
-	copy(debug, sharedInput, 100);
+	permuteMatrixCuda(sharedResult, sharedCopy, d_IPInverseConst, 64);//reverseInitialPermutation(result);
+	copy(debug, sharedResult, 100);
 
 
 	if (threadIdx.x == 0)
 	{
-		uint64_t temp;
+		result = 0;
 		for (int i = 0; i < 64; i++)
 		{
-			temp = sharedResult[0];
-			temp <<= i;
-			result += temp;
+			result <<= 1;
+			result += sharedResult[63 - i] &1;
 		}
 		results[blockIdx.x] = result;
-		debugInt[0] = result;
 	}
 	__syncthreads();
 }
@@ -299,7 +304,7 @@ __global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, uint64_t* 
 		permuteMatrixCuda(sharedRoundkey, d_PC2Const, 48);//roundKeyPermutation(permutedRoundKey);
 
 		// Shift key to the right for the next iteration
-		generateReverseShiftedKeyCuda(i, sharedKey);
+		rightCircularShiftCuda(sharedKey, sharedCopy, i);
 
 		// Expansion permutation of input's right side (R).
 		permuteMatrixCuda(sharedInput, d_EConst, 48);//expandPermutation(input); // 48 bits
@@ -328,7 +333,7 @@ __global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, uint64_t* 
 	}
 
 	swapLRCuda(sharedResult);
-	permuteMatrixCuda(sharedResult, d_IPInverseConst, 64);//reverseInitialPermutation(result);
+	permuteMatrixCuda(sharedResult, sharedCopy, d_IPInverseConst, 64);//reverseInitialPermutation(result);
 
 	if (threadIdx.x == 0)
 	{
@@ -493,14 +498,16 @@ __global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, uint64_t* 
 //	debug[11 + tid * n] = messages[tid];
 //}
 
-__device__ void permuteMatrixCuda(unsigned char* input, const unsigned char* P, unsigned int size)
+__device__ void permuteMatrixCuda(unsigned char* input, unsigned char* sharedCopy, const unsigned char* P, unsigned int size)
 {
 	// Figure out how to not make warps here.
+	sharedCopy[threadIdx.x] = input[threadIdx.x];
+	__syncthreads();
+
 	unsigned char bit;
 	if (threadIdx.x < size)
 	{
-		bit = input[P[threadIdx.x] - 1] & 1;
-		__syncthreads();
+		bit = sharedCopy[P[threadIdx.x] - 1] & 1;
 		input[threadIdx.x] = bit;
 	}
 	if (threadIdx.x >= size)
@@ -509,23 +516,11 @@ __device__ void permuteMatrixCuda(unsigned char* input, const unsigned char* P, 
 	}
 	__syncthreads();
 }
-__device__ void generateShiftedKeyCuda(const int& index, unsigned char* roundKey)
-{
-	// circular shifts
-	leftCircularShiftCuda(roundKey, d_LCSConst[index]);
-}
-__device__ void generateReverseShiftedKeyCuda(const int& index, unsigned char* roundKey)
-{
-	// circular shifts
-	rightCircularShiftCuda(roundKey, d_LCSConst[index]);
-}
 
-__device__ void leftCircularShiftCuda(unsigned char* input, uint8_t times)
+__device__ void leftCircularShiftCuda(unsigned char* input, unsigned char* sharedCopy, uint8_t times)
 {
-	__shared__ unsigned char sharedKeyCopy[64];
-
 	// copying the key
-	sharedKeyCopy[threadIdx.x] = input[threadIdx.x];
+	sharedCopy[threadIdx.x] = input[threadIdx.x];
 	__syncthreads();
 
 	// set offset to determine left and right (L,R) sides of key.
@@ -538,17 +533,15 @@ __device__ void leftCircularShiftCuda(unsigned char* input, uint8_t times)
 	index = (index >= 56) ? (offset+index%8) : index;
 
 	// Finally applying the shift
-	input[index] = sharedKeyCopy[threadIdx.x];
+	input[index] = sharedCopy[threadIdx.x];
 	__syncthreads();
 }
 
 // Note: maximum of 28 shifts at call of function
-__device__ void rightCircularShiftCuda(unsigned char* input, uint8_t times)
+__device__ void rightCircularShiftCuda(unsigned char* input, unsigned char* sharedCopy, uint8_t times)
 {
-	__shared__ unsigned char sharedKeyCopy[64];
-
 	// copying the key
-	sharedKeyCopy[threadIdx.x] = input[threadIdx.x];
+	sharedCopy[threadIdx.x] = input[threadIdx.x];
 	__syncthreads();
 
 	// set offset to determine left and right (L,R) sides of key.
@@ -561,11 +554,11 @@ __device__ void rightCircularShiftCuda(unsigned char* input, uint8_t times)
 	index = (index >= 56) ? (offset + index % 8) : index;
 
 	// Finally applying the shift
-	input[index] = sharedKeyCopy[threadIdx.x];
+	input[index] = sharedCopy[threadIdx.x];
 	__syncthreads();
 }
 
-__device__ void substituteCuda(unsigned char* input)
+__device__ void substituteCuda(unsigned char* input, uint16_t* sharedX, uint16_t* sharedY, unsigned char* sharedOutput)
 {
 	// 16 inputs (8 x,y pairs) and 8 outputs - 8 extractions from SBox. 
 	// 64 threads will allow for 8 simulataneous extractions.
@@ -573,9 +566,6 @@ __device__ void substituteCuda(unsigned char* input)
 
 	// Thus, 16 threads will suffice to calculate x,y pairs.
 	// 8 threads for each of x and y.
-	__shared__ uint16_t sharedX[8];
-	__shared__ uint16_t sharedY[8];
-	__shared__ unsigned char sharedOutput[8];
 
 	int tid = threadIdx.x;
 
@@ -634,17 +624,13 @@ __device__ void substituteCuda(unsigned char* input)
 
 	__syncthreads();
 }
-__device__ void substituteCudaDebug(unsigned char* input, unsigned char* debug, uint64_t* debugInt)
+__device__ void substituteCudaDebug(unsigned char* input, uint16_t* sharedX, uint16_t* sharedY, unsigned char* sharedOutput, unsigned char* debug, uint64_t* debugInt)
 {
 	// 16 inputs (8 x,y pairs) and 8 outputs - 8 extractions from SBox. 
 	// 64 threads will allow for 8 simulataneous extractions.
 
-
 	// Thus, 16 threads will suffice to calculate x,y pairs.
 	// 8 threads for each of x and y.
-	__shared__ uint16_t sharedX[8];
-	__shared__ uint16_t sharedY[8];
-	__shared__ unsigned char sharedOutput[8];
 
 	int tid = threadIdx.x;
 
@@ -654,6 +640,7 @@ __device__ void substituteCudaDebug(unsigned char* input, unsigned char* debug, 
 	{
 		sharedY[threadIdx.x] = 0;
 		sharedX[threadIdx.x] = 0;
+		sharedOutput[threadIdx.x] = 0;
 		// y = b5,b0 then b11,b6, b17,b12 ... b47,b42 i.e. tid*6 + 5, tid*6
 		uint8_t y = (input[tid * 6 + 5]) << 1;
 		y += input[tid * 6];
@@ -787,35 +774,11 @@ __device__ void substituteCudaDebug(unsigned char* input, unsigned char* debug, 
 //
 //	__syncthreads();
 //}
-__device__ void swapLRCuda(unsigned char* input) // Swap left (32 bit) and right (32 bit) parts of the 64 bit input.
+__device__ void swapLRCuda(unsigned char* input, unsigned char* sharedCopy) // Swap left (32 bit) and right (32 bit) parts of the 64 bit input.
 {
-	__shared__ unsigned char temp[64];
-	temp[threadIdx.x] = input[threadIdx.x];
+	sharedCopy[threadIdx.x] = input[threadIdx.x];
 	__syncthreads();
 
-	input[threadIdx.x] = temp[(threadIdx.x + 32)%64];
+	input[threadIdx.x] = sharedCopy[(threadIdx.x + 32)%64];
 	__syncthreads();
-}
-
-// Preemptively shifting all keys using LCS matrix.
-__device__ void fullShiftLCSCuda(uint64_t& roundKey)
-{
-
-	//uint32_t left, right;
-	//uint64_t mask28Bits = 268435455; // covers first 28 bits
-
-	//// getting left and right sides
-	//right = roundKey & mask28Bits;
-	//mask28Bits <<= 28;
-	//mask28Bits = roundKey & mask28Bits;
-	//left = mask28Bits >> 28;
-	//
-	//// circular shifts
-	//leftCircularShiftCuda(left, 28);
-	//leftCircularShiftCuda(right, 28);
-
-	//// copying left and right shifted keys to roundKey.
-	//roundKey = left;
-	//roundKey <<= 28;
-	//roundKey += right;
 }
