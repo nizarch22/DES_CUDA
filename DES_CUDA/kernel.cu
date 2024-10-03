@@ -17,9 +17,9 @@
         exit(EXIT_FAILURE); \
     } \
 } 
-
+#define DEBUG_ITERATION 0
 #define NUM_TESTS 9
-#define NUM_TESTS_QUICK 6
+#define NUM_TESTS_QUICK 4
 int main()
 {
     // kernel parameters
@@ -33,9 +33,6 @@ int main()
 
     const int bytesLargest = 268435456;
     //// Kernel arguments prep stage ////
-    // prep matrices, sboxes
-    const unsigned char* matrices[7] = {IP,PC1,PC2, E, PMatrix,IPInverse, LCS};
-    const int matricesSizes[7] = { 64,56,48,48,32,64,16 };
     // prep keys, messages, encryptions, decryptions
     uint64_t* d_messages, * d_keys;
     uint64_t* messages = (uint64_t*)malloc(bytesLargest);
@@ -58,19 +55,6 @@ int main()
     cudaMalloc(&d_resultsDecryption, bytesLargest);
 
     int endTimeAlloc = clock();
-
-    int startTimeCopyMatrices = clock(); // Used to measure the time GPU finishes execution since copying started.
-    // cuda copy memory - matrices, sboxes
-    cudaMemcpyToSymbol(d_SBoxesConst, &SBoxes[0][0], 512, 0, cudaMemcpyHostToDevice);;
-    int offset = 0;
-    for (int i = 0; i < 7; i++)
-    {
-        cudaMemcpyToSymbol(d_matricesConst, &matrices[i][0], matricesSizes[i], offset, cudaMemcpyHostToDevice);;
-        //cudaMemcpy(d_matrices + offset, &matrices[i][0], matricesSizes[i], cudaMemcpyHostToDevice);
-        offset += matricesSizes[i];
-    }
-    int endTimeCopyMatrices = clock(); // Used to measure the time GPU finishes execution since copying started.
-
 
     // verification parameters
     bool bEqualDecrypt, bEqualEncrypt;
@@ -96,6 +80,146 @@ int main()
         cudaMemcpy(d_keys, keys, bytesKeys[testCount], cudaMemcpyHostToDevice);
         endTimeInputCopy[testCount] = clock();
 
+        //Debug - delete later
+        unsigned char debug[64000];
+        uint64_t debugInt[101];
+        debugInt[100] = DEBUG_ITERATION;
+        unsigned char* d_debug;
+        uint64_t* d_debugInt;
+        cudaMalloc(&d_debug, 6400);
+        cudaMalloc(&d_debugInt, 64*8);
+
+        debugFoo << < 1, 64 >> > (d_messages, d_keys, d_resultsEncryption, d_debug, d_debugInt);
+        cudaDeviceSynchronize(); // wait for encrypt to finish
+        cudaMemcpy(&debugInt[0], d_debugInt, 101*8,cudaMemcpyDeviceToHost);
+        cudaMemcpy(&debug[0], d_debug, 6400,cudaMemcpyDeviceToHost);
+        cudaDeviceSynchronize(); // wait for encrypt to finish
+
+        std::cout << "Messages:\n";
+        std::cout << (messages[0]) << "\n";
+        std::cout << (debugInt[0]) << "\n";
+
+        std::cout << "Keys:\n";
+        std::cout << (keys[0]) << "\n";
+        std::cout << (debugInt[1]) << "\n";
+        
+
+
+        //uint64_t roundkey, left, result;
+
+        //uint64_t key = keys[0]; 
+        //uint64_t msg = messages[0]; 
+
+        //int size = 64;
+        //
+        //// key
+        //permuteMatrix(key, PC1, 56);
+        //
+        //// key shifts
+        //generateShiftedKey(1, key);
+        //
+        //// roundkey permutation PC2
+        //roundkey = key;
+        //permuteMatrix(roundkey, PC2, 48);
+
+        ////input
+        //permuteMatrix(msg, IP, 64);
+
+        ////preserve left and right
+        //left = msg;
+        //left >>= 32;
+        //// right
+        //result = msg;
+        //result <<= 32;
+        ////permute
+        //permuteMatrix(msg, E, 48);
+
+        //msg ^= roundkey;
+
+        //substitute(msg);
+
+        //permuteMatrix(msg, PMatrix, 32);
+
+        //msg <<= 32;
+        //msg >>= 32;
+        //result += msg^left;
+        //uint64_t temp = result;
+        uint64_t temp;
+        uint64_t debugCPU[101];
+        uint64_t debugGPU[101];
+        for (int i = 0; i <= 100; i++)
+        {
+            uint64_t word = 0;
+            for (int j = 0; j < 64; j++)
+            {
+                word <<= 1;
+                word += debug[i * 64 + 63-j];
+            }
+            debugGPU[i] = word;
+        }
+        debugCPU[100] = DEBUG_ITERATION;
+        EncryptDESDebug(messages[0], keys[0], temp, debugCPU);
+        int size = 64;
+        // first 3 checks
+        for (int i = 0; i < 2; i++)
+        {
+            if (debugCPU[i]!=debugGPU[i])
+            {
+                std::cout << "Mistmatch occured. Round: " << i % 6 << "\n";
+                std::cout << debugCPU[i] << " != " << debugGPU[i] << "\n";
+                return -1;
+            }
+        }
+        for (int i = 3; i <= 98; i++)
+        {
+            if (debugCPU[i] != debugGPU[i])
+            {
+                std::cout << "Mistmatch occured. Iteration: " << (i - 3) / 6 << ", Index: " << 3+(i-3)%6 << "\n";
+                std::cout << debugCPU[i] << " != " << debugGPU[i] << "\n";
+                for (int j = 0; j < 64; j++)
+                {
+                    std::cout << (int)(debug[i*64+j]) << ",";
+                }
+                std::cout << "\n";
+                uint64_t mismatchedWord = debugCPU[i];
+                for (int j = 0; j < 64; j++)
+                {
+                    std::cout << (mismatchedWord&1) << ",";
+                    mismatchedWord >>= 1;
+                }
+                std::cout << "\n";
+
+                std::cout << "results from sboxout\n";
+                for (int i = 0; i < 8; i++)
+                {
+                    std::cout << debugInt[i] << ",";
+                }
+                std::cout << "\n";
+                for (int i = 0; i < 8; i++)
+                {
+                    std::cout << debugCPU[40+i] << ",";
+                }
+                std::cout << "\n";
+                return -1;
+            }
+        }
+        if (debugInt[2+5] == temp)
+        {
+            std::cout << "match!\n";
+        }
+        for (int i = 0; i < 32; i++)
+        {
+            unsigned char bit = temp & 1;
+            std::cout << (int)bit << " = " << (int)debug[i] << "\n";
+            if (bit != (debug[i]))
+            {
+                std::cout << "bit mismatch!\n";
+                return -1;
+            }
+            temp >>= 1;
+        }
+
+        return 0;
         //// Run Encryption & Decryption in CUDA stage ////
         // We encrypt the messages using EncryptDESCuda. Then, we use all those encrypted messages to run DecryptDESCuda.
         startTimeExecute[testCount] = clock();
@@ -112,27 +236,19 @@ int main()
         // cuda check for errors in CUDA execution
         CHECK_CUDA_ERROR(cudaGetLastError());
 
-        //startTimeCPU[testCount] = clock();
-        //for (int i = 0; i < numMessages[testCount]; i++)
-        //{
-        //    EncryptDES(messages[i], keys[i], encryptions[i]);
-        //    DecryptDES(encryptions[i], keys[i], decryptions[i]);
-        //}
-        //endTimeCPU[testCount] = clock();
-
-        ////// GPU-CPU encryption-decryption validation stage ////
-        //for (int i = 0; i < numMessages[testCount]; i++)
-        //{
-        //    bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
-        //    bEqualEncrypt &= (resultsEncryption[i] == encryptions[i]);
-        //}
+        for (int i = 0; i < numMessages[testCount]; i++)
+        {
+            bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
+        }
     }
 
-    //if (!bEqualEncrypt)
-    //{
-    //    std::cout << "CPU-GPU Encryption comparison failed!\n";
-    //    return 0;
-    //}
+
+
+    if (!bEqualDecrypt)
+    {
+        std::cout << "GPU Decryption comparison failed!\n";
+        return 0;
+    }
     //if (!bEqualDecrypt)
     //{
     //    std::cout << "Decryption-message comparison failed!\n";
@@ -150,7 +266,6 @@ int main()
     //int CPUTime;
     int CUDATime, CUDATimeCopy, CUDATimeExecute;
     int CUDATimeAlloc = endTimeAlloc - startTimeAlloc;
-    int CUDATimeCopyMatrices = endTimeCopyMatrices - startTimeCopyMatrices;
     
     double throughput, speedup, speedupExecute;
 
@@ -158,7 +273,7 @@ int main()
     for (int i = 0; i < NUM_TESTS_QUICK; i++)
     {
         CUDATimeExecute = endTimeExecute[i] - startTimeExecute[i];
-        CUDATimeCopy = CUDATimeExecute + endTimeInputCopy[i] - startTimeInputCopy[i] + CUDATimeCopyMatrices;
+        CUDATimeCopy = CUDATimeExecute + endTimeInputCopy[i] - startTimeInputCopy[i];
         CUDATime = CUDATimeCopy+CUDATimeAlloc;
         //CPUTime = endTimeCPU[i] - startTimeCPU[i];
         // printout of timing results

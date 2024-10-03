@@ -25,7 +25,7 @@ void initialPermutation(uint64_t& input)
 void substitute(uint64_t& input)
 {
 	uint64_t result = 0; uint64_t temp;
-	uint8_t y, x;
+	uint16_t y, x;
 	uint8_t in;
 
 	uint64_t mask = 63;
@@ -41,8 +41,7 @@ void substitute(uint64_t& input)
 		y = (in & maskY2) >> 4;
 		y += in & maskY1;
 
-		// Substitution 
-		temp = SBoxes[i][y * 16 + x];
+		temp = SBoxes[i][(y * 16) + x];
 		result += temp << (4 * i);
 
 		// next bits
@@ -236,6 +235,7 @@ void EncryptDES(const uint64_t& plaintext, const uint64_t& key, uint64_t& encryp
 
 		// Round key
 		generateShiftedKey(i, shiftedKey);
+
 		permutedRoundKey = shiftedKey;
 		roundKeyPermutation(permutedRoundKey);
 
@@ -247,21 +247,62 @@ void EncryptDES(const uint64_t& plaintext, const uint64_t& key, uint64_t& encryp
 
 		// Substitution S-boxes
 		substitute(input); // 32 bits
-		
+
 		// "P-matrix" permutation i.e. mix/shuffle
 		mixPermutation(input); 
 
 		// XOR with preserved left side
 		result += left^input; // Result[31:0] = L XOR f[31:0];
 
+
 		// End of loop
 		input = result;
+
+		if (i == 0)
+		{
+			encryption = input;
+			return;
+		}
 	}
 
 	swapLR(result);
 	reverseInitialPermutation(result);
 }
 
+
+void substituteDebug(uint64_t& input, uint64_t* debug)
+{
+	uint64_t result = 0; uint64_t temp;
+	uint16_t y, x;
+	uint8_t in;
+
+	uint64_t mask = 63;
+	uint8_t maskY1, maskY2, maskX;
+	maskY1 = 1;
+	maskY2 = 32;
+	maskX = 30;
+	for (int i = 0; i < 8; i++)
+	{
+		// getting x,y coordinates for Sbox
+		in = input & mask;
+		x = (in & maskX) >> 1;
+		y = (in & maskY2) >> 4;
+		y += in & maskY1;
+
+		temp = SBoxes[i][(y * 16) + x];
+
+		// debug code
+		debug[40 + i] = temp;
+		debug[40 + i +8] = x;
+		debug[40 + i +16] = y;
+
+		result += temp << (4 * i);
+
+		// next bits
+		input >>= 6;
+	}
+	input = result;
+}
 void EncryptDESDebug(const uint64_t& plaintext, const uint64_t& key, uint64_t& encryption, uint64_t* debug)
 {
 	uint64_t& result = encryption; // setting alias for encryption
@@ -277,6 +318,7 @@ void EncryptDESDebug(const uint64_t& plaintext, const uint64_t& key, uint64_t& e
 	debug[1] = shiftedKey;
 	permuteMatrix(shiftedKey, PC1, 56); // PC1 of key
 	debug[2] = shiftedKey;
+
 	for (int i = 0; i < 16; i++)
 	{
 		// Preserving L,R.
@@ -288,26 +330,29 @@ void EncryptDESDebug(const uint64_t& plaintext, const uint64_t& key, uint64_t& e
 
 		// Round key
 		generateShiftedKey(i, shiftedKey);
-		debug[3] = shiftedKey;
+		debug[3+i*6] = shiftedKey;
 		permutedRoundKey = shiftedKey;
 		roundKeyPermutation(permutedRoundKey);
-		debug[4] = permutedRoundKey;
+		debug[4+i * 6] = permutedRoundKey;
 
 		// Expansion permutation
 		expandPermutation(input); // 48 bits
-		debug[5] = input;
+		debug[5+i * 6] = input;
 
 		// XOR with permuted round key
 		input ^= permutedRoundKey;
-		debug[6] = input;
+		debug[6+i * 6] = input;
 
 		// Substitution S-boxes
-		substitute(input); // 32 bits
-		debug[7] = input;
-
+		substituteDebug(input, debug); // 32 bits
+		debug[7+i * 6] = input;
+		if (i == debug[100])
+		{
+			return;
+		}
 		// "P-matrix" permutation i.e. mix/shuffle
 		mixPermutation(input);
-		debug[8] = input;
+		debug[8+i * 6] = input;
 
 		// XOR with preserved left side
 		result += left ^ input; // Result[31:0] = L XOR f[31:0];
@@ -317,10 +362,10 @@ void EncryptDESDebug(const uint64_t& plaintext, const uint64_t& key, uint64_t& e
 	}
 
 	swapLR(result);
-	debug[9] = result;
+	debug[99] = result;
 
 	reverseInitialPermutation(result);
-	debug[10] = result;
+	debug[100] = result;
 
 }
 void DecryptDES(const uint64_t& encryption, const uint64_t& key, uint64_t& decryption)
