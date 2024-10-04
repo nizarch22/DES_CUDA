@@ -17,7 +17,21 @@ __device__ void permuteMatrixCuda(unsigned char* input, unsigned char* sharedCop
 
 __device__ void copy(unsigned char* debug, unsigned char* target, int num)
 {
-	debug[threadIdx.x + num*64] = target[threadIdx.x];
+	debug[threadIdx.x + num*64 + blockIdx.x * 150*64] = target[threadIdx.x];
+	__syncthreads();
+}
+__global__ void debugFoo1(uint64_t* messages, uint64_t* keys, uint64_t* results, unsigned char* debug, uint64_t* debugInt)
+{
+	uint64_t input;
+	uint64_t shiftedKey;
+	input = messages[blockIdx.x];
+	shiftedKey = keys[blockIdx.x];
+	__syncthreads();
+	debugInt[blockIdx.x] = messages[blockIdx.x];
+
+	if (threadIdx.x == 0)
+	{
+	}
 	__syncthreads();
 }
 __global__ void debugFoo(uint64_t* messages, uint64_t* keys, uint64_t* results, unsigned char* debug, uint64_t* debugInt)
@@ -61,10 +75,11 @@ __global__ void debugFoo(uint64_t* messages, uint64_t* keys, uint64_t* results, 
 	}
 	__syncthreads();
 
-
-
-	debugInt[0] = input;
-	debugInt[1] = shiftedKey;
+	if (threadIdx.x == 0)
+	{
+		debugInt[0 + blockIdx.x * 150] = input;
+		debugInt[1 + blockIdx.x * 150] = shiftedKey;
+	}
 	__syncthreads();
 
 	// Initial operations 
@@ -126,7 +141,7 @@ __global__ void debugFoo(uint64_t* messages, uint64_t* keys, uint64_t* results, 
 
 		copy(debug, sharedInput, 7 + i * 6);
 
-		if (debugInt[149] == i)
+		if (debugInt[149 + blockIdx.x * 150] == i)
 		{
 			__syncthreads();
 			return;
@@ -159,7 +174,6 @@ __global__ void debugFoo(uint64_t* messages, uint64_t* keys, uint64_t* results, 
 
 	permuteMatrixCuda(sharedResult, sharedCopy, d_IPInverseConst, 64);//reverseInitialPermutation(result);
 	copy(debug, sharedResult, 100);
-
 
 	if (threadIdx.x == 0)
 	{
@@ -656,16 +670,15 @@ __device__ void substituteCudaDebug(unsigned char* input, uint16_t* sharedX, uin
 	// 8 threads for each of x and y.
 
 	int tid = threadIdx.x;
+	uint8_t x = 0;
+	uint8_t y = 0;
 
 	// Y calculation
 	// Threads 0 -> 7 work here - First warp
 	if (tid < 8)
 	{
-		sharedY[threadIdx.x] = 0;
-		sharedX[threadIdx.x] = 0;
-		sharedOutput[threadIdx.x] = 0;
 		// y = b5,b0 then b11,b6, b17,b12 ... b47,b42 i.e. tid*6 + 5, tid*6
-		uint8_t y = (input[tid * 6 + 5]) << 1;
+		y = (input[tid * 6 + 5]) << 1;
 		y += input[tid * 6];
 		sharedY[tid] = y;
 	}
@@ -677,7 +690,7 @@ __device__ void substituteCudaDebug(unsigned char* input, uint16_t* sharedX, uin
 		// x = b4,b3,b2,b1 then b10,...,b7 i.e. tid * 6 + 4, ..., tid * 6 + 1
 		// note we reduced tid by 8, as we work with threads 8->15.
 		// i.e. (tid-8) * 6 + 4, ..., (tid-8) * 6 + 1
-		uint8_t x = 0;
+		x = 0;
 		for (int i = 1; i < 5; i++)
 		{
 			x += input[(tid - 32) * 6 + i] << (i - 1);
@@ -685,20 +698,23 @@ __device__ void substituteCudaDebug(unsigned char* input, uint16_t* sharedX, uin
 		sharedX[tid - 32] = x;
 	}
 
+	// Y calculation 
+
+
+
 	// Extract Sbox output and place it into 'input'
 	__syncthreads(); // Warps are joined here.
 	// Clean slate for input 
 	input[tid] = 0;
-	debugInt[tid] = 0;
 	__syncthreads();
 	// Threads 0 -> 7 work here - First warp
 	if (tid < 8)
 	{
 		//return;
 		sharedOutput[tid] = d_SBoxesConst[tid][(sharedY[tid] << 4) + sharedX[tid]];
-		debugInt[tid] = sharedOutput[tid];
-		debugInt[tid + 8] = sharedX[tid];
-		debugInt[tid + 16] = sharedY[tid];
+		debugInt[tid + blockIdx.x * 150] = sharedOutput[tid];
+		debugInt[tid + 8 + blockIdx.x * 150] = sharedX[tid];
+		debugInt[tid + 16 + blockIdx.x * 150] = sharedY[tid];
 		
 		//debugInt[2 + tid] = sharedOutput[tid];
 	}

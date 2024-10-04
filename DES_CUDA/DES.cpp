@@ -306,6 +306,8 @@ void EncryptDESDebug(const uint64_t& plaintext, const uint64_t& key, uint64_t& e
 	uint64_t permutedRoundKey;
 	uint64_t left; // last 32 bits of plaintext/input to algorithm are preserved in this variable 
 
+	debug[140] = input;
+	debug[141] = shiftedKey;
 	// Initial operations 
 	initialPermutation(input);
 	debug[0] = input;
