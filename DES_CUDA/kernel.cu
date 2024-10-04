@@ -64,7 +64,7 @@ int main()
     int endTimeRetrieveResults[NUM_TESTS];
     //int startTimeCPU[NUM_TESTS]; int endTimeCPU[NUM_TESTS];
 
-    for (int testCount = 2; testCount < NUM_TESTS_QUICK; testCount++)
+    for (int testCount = 0; testCount < NUM_TESTS_QUICK; testCount++)
     {
         // generating random messages and keys
         for (int i = 0; i < numMessages[testCount]; i++)
@@ -96,21 +96,29 @@ int main()
         cudaMalloc(&d_debugInt, byteTestingDebugInt);
         cudaMemcpy(d_debugInt, debugInt, byteTestingDebugInt, cudaMemcpyHostToDevice);
 
+
         debugFoo << < numTesting, 64 >> > (d_messages, d_keys, d_resultsEncryption, d_debug, d_debugInt);
         cudaDeviceSynchronize(); // wait for encrypt to finish
         cudaMemcpy(&debug[0], d_debug, byteTestingDebug, cudaMemcpyDeviceToHost);
         cudaMemcpy(&debugInt[0], d_debugInt, byteTestingDebugInt, cudaMemcpyDeviceToHost);
         cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
         cudaDeviceSynchronize(); // wait for memory to arrive
+        debugFooDecrypt << < numTesting, 64 >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
+        cudaDeviceSynchronize(); // wait for decrypt to finish
+        cudaMemcpy(resultsDecryption, d_resultsDecryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
+        cudaDeviceSynchronize(); // wait for memory to arrive
 
-        //for (int i = 0; i < numTesting; i++)
-        //{
-        //    if (debugInt[i] != messages[i])
-        //    {
-        //        std::cout << "It did not work.\n";
-        //    }
-        //}
-        //return 0;
+        for (int i = 0; i < numTesting; i++)
+        {
+            if (resultsDecryption[i] != messages[i])
+            {
+                std::cout << "Error in decryption!\n";
+                return -1;
+            }
+        }
+        std::cout << "Success!\n";
+        return 0;
+
         uint64_t temp = 0;
         uint64_t debugCPU[150] = { 0 };
         uint64_t debugGPU[150] = { 0 };

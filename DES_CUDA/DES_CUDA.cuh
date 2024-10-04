@@ -14,6 +14,7 @@ __global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, uint64_t* 
 
 // Debug - delete later
 __global__ void debugFoo(uint64_t* messages, uint64_t* keys, uint64_t* results, unsigned char* debug, uint64_t* debugInt);
+__global__ void debugFooDecrypt(uint64_t* messages, uint64_t* keys, uint64_t* results);
 
 
 // defining permutation matrices
