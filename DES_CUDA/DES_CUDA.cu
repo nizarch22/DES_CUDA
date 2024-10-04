@@ -44,12 +44,11 @@ __global__ void debugFoo(uint64_t* messages, uint64_t* keys, uint64_t* results, 
 	__shared__ unsigned char sharedRoundkey[64];
 	__shared__ uint64_t result; // setting alias for encryption
 
-	// General shared array for copying input. Used in the following functions: permuteMatrixCuda, swapLRCuda, leftCircularShiftCuda, rightCircularShiftCuda
+	// General shared array. Typically for copying input. Used in the following functions: permuteMatrixCuda, swapLRCuda, leftCircularShiftCuda, rightCircularShiftCuda
 	__shared__ unsigned char sharedCopy[64];
 	// Special arrays for 'subsituteCuda' function:
 	__shared__ uint16_t sharedX[8];
 	__shared__ uint16_t sharedY[8];
-	__shared__ unsigned char sharedOutput[8];
 
 	uint64_t input;
 	uint64_t shiftedKey;
@@ -137,7 +136,7 @@ __global__ void debugFoo(uint64_t* messages, uint64_t* keys, uint64_t* results, 
 
 		// Substitution S-boxes
 		//substituteCuda(sharedInput); // 32 bits
-		substituteCudaDebug(sharedInput, sharedX, sharedY, sharedOutput, debug, debugInt);
+		substituteCudaDebug(sharedInput, sharedX, sharedY, sharedCopy, debug, debugInt);
 
 		copy(debug, sharedInput, 7 + i * 6);
 
@@ -670,6 +669,7 @@ __device__ void substituteCudaDebug(unsigned char* input, uint16_t* sharedX, uin
 	// 8 threads for each of x and y.
 
 	int tid = threadIdx.x;
+	int setIndex, index, threadPos;
 	uint8_t x = 0;
 	uint8_t y = 0;
 
@@ -685,17 +685,40 @@ __device__ void substituteCudaDebug(unsigned char* input, uint16_t* sharedX, uin
 
 	// X calculation 
 	// Threads 32 -> 39 work here - Second warp
-	if (tid >= 32 && tid < 40)
+	if (tid >= 32)
 	{
 		// x = b4,b3,b2,b1 then b10,...,b7 i.e. tid * 6 + 4, ..., tid * 6 + 1
 		// note we reduced tid by 8, as we work with threads 8->15.
-		// i.e. (tid-8) * 6 + 4, ..., (tid-8) * 6 + 1
-		x = 0;
+		// i.e. (x's index) * 6 + 4, ..., (x's index) * 6 + 1
+
+		// 0,1,2,3 (meaning threads 32,...,35) together make a single x. Then, 4,...,7 etc.
+		// These are our 'thread sets' of 8. Each set will produce a value x, 8 in total. i.e. x's index will be setIndex.
+		index = tid - 32;
+		setIndex = index / 4;
+		threadPos = index % 4;
+
+		sharedOutput[index] = input[6 * setIndex + (threadPos + 1)] << threadPos;
+
+		if (threadPos == 0)
+		{
+			sharedTemp[setIndex]
+		}
+		sharedTemp[setIndex] += x;
 		for (int i = 1; i < 5; i++)
 		{
 			x += input[(tid - 32) * 6 + i] << (i - 1);
 		}
-		sharedX[tid - 32] = x;
+
+		//  Finally set the x values
+		if (threadPos==0)
+		{
+
+			for (int i = 0; i < 4; i++)
+			{
+				sharedX[setIndex] |= sharedOutput[index];
+			}
+
+		}
 	}
 
 	// Y calculation 
