@@ -319,9 +319,6 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* res
 	{
 		sharedX[threadIdx.x] = 0;
 		sharedY[threadIdx.x] = 0;
-	}
-	if (threadIdx.x == 0)
-	{
 		result = 0;
 	}
 	__syncthreads();

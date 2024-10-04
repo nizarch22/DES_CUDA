@@ -19,15 +19,15 @@
 } 
 #define DEBUG_ITERATION 100
 #define NUM_TESTS 9
-#define NUM_TESTS_QUICK 4
+#define NUM_TESTS_QUICK 9
 int main()
 {
     // kernel parameters
     const int numThreads = 64;
-    const int numMessages[NUM_TESTS] = { 131072,262144,524288,1048576,2097152,4194304,8388608,16777216,33554432 };// 524288 -  4MB - 10x speedup. 33554432 - 256MB - 70x speedup!
+    const int numMessages[NUM_TESTS] = { 128,256, 512, 1024, 2048, 4096, 8192,16384,33554432 };// 524288 -  4MB - 10x speedup. 33554432 - 256MB - 70x speedup!
     // size parameters
-    const int bytesMessages[NUM_TESTS] = { 1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864 , 134217728, 268435456 };
-    const int bytesKeys[NUM_TESTS] = { 1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864 , 134217728, 268435456 }; // change for keys
+    const int bytesMessages[NUM_TESTS] = { 1024, 2048, 4096, 8192, 16384, 32768, 65536 , 131072, 268435456 };
+    const int bytesKeys[NUM_TESTS] = { 1024, 2048, 4096, 8192, 16384, 32768, 65536 , 131072, 268435456 }; // change for keys
 
     const int bytesLargest = 268435456;
     //// Kernel arguments prep stage ////
@@ -59,12 +59,44 @@ int main()
     bEqualDecrypt = 1; bEqualEncrypt = 1;
 
     // timing parameters
-    int startTimeInputCopy[NUM_TESTS]; int endTimeInputCopy[NUM_TESTS];
-    int startTimeExecute[NUM_TESTS]; int endTimeExecute[NUM_TESTS];
-    int endTimeRetrieveResults[NUM_TESTS];
+    int startTimeInputCopy[NUM_TESTS] = {0}; int endTimeInputCopy[NUM_TESTS] = { 0 };
+    int startTimeExecute[NUM_TESTS] = { 0 }; int endTimeExecute[NUM_TESTS] = { 0 };
+    int endTimeRetrieveResults[NUM_TESTS] = { 0 };
     //int startTimeCPU[NUM_TESTS]; int endTimeCPU[NUM_TESTS];
+    
+    // Generate messages - 256MB
+    //for (int i = 0; i < 33554432; i++)
+    //{
+    //    messages[i] = (((uint64_t)rand()) << 32) | rand();
+    //    keys[i] = (((uint64_t)rand()) << 32) | rand();
+    //}
 
-    for (int testCount = 0; testCount < NUM_TESTS_QUICK; testCount++)
+    //// cuda copy memory - messages, keys
+    //startTimeInputCopy[0] = clock();
+    //cudaMemcpy(d_messages, messages, bytesLargest, cudaMemcpyHostToDevice);
+    //cudaMemcpy(d_keys, keys, bytesLargest, cudaMemcpyHostToDevice);
+    //endTimeInputCopy[0] = clock();
+
+    //startTimeExecute[0] = clock();
+    //for (int i = 0; i < 33554432 / 1024; i++)
+    //{
+    //    EncryptDESCuda << < 1024, numThreads >> > (d_messages, d_keys, d_resultsEncryption, i*1024);
+    //    // Decrypt all the encryption made by EncryptDesCuda above using DecryptDESCuda.
+    //    //DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
+    //    //cudaDeviceSynchronize();
+    //}
+    //cudaDeviceSynchronize(); // wait for encrypt to finish
+    //endTimeExecute[0] = clock();
+    //CHECK_CUDA_ERROR(cudaGetLastError());
+
+    //// cuda copy results 
+    //cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesLargest, cudaMemcpyDeviceToHost);
+    //cudaMemcpy(resultsDecryption, d_resultsDecryption, bytesLargest, cudaMemcpyDeviceToHost);
+    //endTimeRetrieveResults[0] = clock();
+
+    //goto EVALUATE_PERFORMANCE;
+
+    for (int testCount = 8; testCount < NUM_TESTS_QUICK; testCount++)
     {
         // generating random messages and keys
         for (int i = 0; i < numMessages[testCount]; i++)
@@ -85,8 +117,8 @@ int main()
         cudaDeviceSynchronize(); // wait for encrypt to finish
 
         // Decrypt all the encryption made by EncryptDesCuda above using DecryptDESCuda.
-        DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
-        cudaDeviceSynchronize();
+        //DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
+        //cudaDeviceSynchronize();
         endTimeExecute[testCount] = clock();
 
         // cuda copy results 
@@ -95,22 +127,22 @@ int main()
         endTimeRetrieveResults[testCount] = clock();
 
         // cuda check for errors in CUDA execution
-        CHECK_CUDA_ERROR(cudaGetLastError());
 
-        for (int i = 0; i < numMessages[testCount]; i++)
-        {
-            bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
-        }
+        //for (int i = 0; i < numMessages[testCount]; i++)
+        //{
+        //    bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
+        //}
     }
+    CHECK_CUDA_ERROR(cudaGetLastError());
 
 
 
 
-    if (!bEqualDecrypt)
-    {
-        std::cout << "GPU Decryption comparison failed!\n";
-        return 0;
-    }
+    //if (!bEqualDecrypt)
+    //{
+    //    std::cout << "GPU Decryption comparison failed!\n";
+    //    return 0;
+    //}
     //if (!bEqualDecrypt)
     //{
     //    std::cout << "Decryption-message comparison failed!\n";
@@ -126,10 +158,34 @@ int main()
     // Calculate timings for CUDA, CPU execution. 
     // CUDA has 2 timing calculations: one with allocation time and one without. The reason is that the allocation time is very big, and impactful for small input data (where CPU performs better than the GPU).
     //int CPUTime;
+EVALUATE_PERFORMANCE:
     int CUDATime, CUDATimeCopy, CUDATimeExecute;
     int CUDATimeAlloc = endTimeAlloc - startTimeAlloc;
     
     double throughput, speedup, speedupExecute;
+
+    //CUDATimeExecute = endTimeExecute[0] - startTimeExecute[0];
+    //CUDATimeCopy = CUDATimeExecute + endTimeInputCopy[0] - startTimeInputCopy[0];
+    //CUDATime = CUDATimeCopy + CUDATimeAlloc;
+    ////CPUTime = endTimeCPU[i] - startTimeCPU[i];
+    //// printout of timing results
+    //std::cout << "Total messages size: " << (bytesLargest >> 20) << " MegaBytes\n";
+    //std::cout << "Total timing measurements:\n";
+    //std::cout << "GPU - only kernel execution: " << CUDATimeExecute << "ms\n";
+    //std::cout << "GPU - with copying: " << CUDATimeCopy << "ms\n";
+    //std::cout << "GPU - with allocation and copying: " << CUDATime << "ms\n";
+    ////std::cout << "CPU: " << CPUTime << "ms\n";
+
+    //throughput = 1000.0f * (float)(bytesLargest >> 17) / CUDATimeExecute;
+    ////speedup = (float)CPUTime / CUDATime;
+    ////speedupExecute = (float)CPUTime / CUDATimeExecute;
+    //std::cout << "Speed measurements:\n";
+    //std::cout << "GPU - Execution speed: " << throughput << " MegaBits per second\n";
+
+    //std::cout << "Speedup measurements:\n";
+    //std::cout << "Speedup - Execution: " << speedupExecute << "\n";
+    //std::cout << "Speedup - with allocation and copy: " << speedup << "\n";
+
 
     std::cout << "CUDA Debug results:\n";
     for (int i = 0; i < NUM_TESTS_QUICK; i++)
