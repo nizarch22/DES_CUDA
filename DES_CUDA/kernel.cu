@@ -64,7 +64,7 @@ int main()
     int endTimeRetrieveResults[NUM_TESTS];
     //int startTimeCPU[NUM_TESTS]; int endTimeCPU[NUM_TESTS];
 
-    for (int testCount = 0; testCount < NUM_TESTS_QUICK; testCount++)
+    for (int testCount = 2; testCount < NUM_TESTS_QUICK; testCount++)
     {
         // generating random messages and keys
         for (int i = 0; i < numMessages[testCount]; i++)
@@ -78,7 +78,7 @@ int main()
         cudaMemcpy(d_keys, keys, bytesKeys[testCount], cudaMemcpyHostToDevice);
         endTimeInputCopy[testCount] = clock();
 
-        int numTesting = numMessages[testCount];
+        const uint64_t numTesting = numMessages[testCount];
         //Debug - delete later
         const uint64_t byteTestingDebug = numTesting * 150 * 64;
         const uint64_t byteTestingDebugInt = numTesting * 150 * 8;
@@ -338,9 +338,9 @@ int main()
         //// Run Encryption & Decryption in CUDA stage ////
         // We encrypt the messages using EncryptDESCuda. Then, we use all those encrypted messages to run DecryptDESCuda.
         startTimeExecute[testCount] = clock();
-        EncryptDESCuda << < numBlocks[testCount], numThreads >> > (d_messages, d_keys, d_resultsEncryption);
+        EncryptDESCuda << < numMessages[testCount], numThreads >> > (d_messages, d_keys, d_resultsEncryption);
         cudaDeviceSynchronize(); // wait for encrypt to finish
-        DecryptDESCuda << <numBlocks[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
+        DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
         cudaDeviceSynchronize();
         endTimeExecute[testCount] = clock();
         // cuda copy results 

@@ -70,7 +70,6 @@ __global__ void debugFoo(uint64_t* messages, uint64_t* keys, uint64_t* results, 
 	{
 		sharedX[threadIdx.x] = 0;
 		sharedY[threadIdx.x] = 0;
-		sharedOutput[threadIdx.x] = 0;
 	}
 	__syncthreads();
 
@@ -672,6 +671,7 @@ __device__ void substituteCudaDebug(unsigned char* input, uint16_t* sharedX, uin
 	int setIndex, index, threadPos;
 	uint8_t x = 0;
 	uint8_t y = 0;
+	unsigned char byte, bit;
 
 	// Y calculation
 	// Threads 0 -> 7 work here - First warp
@@ -679,88 +679,137 @@ __device__ void substituteCudaDebug(unsigned char* input, uint16_t* sharedX, uin
 	{
 		// y = b5,b0 then b11,b6, b17,b12 ... b47,b42 i.e. tid*6 + 5, tid*6
 		y = (input[tid * 6 + 5]) << 1;
-		y += input[tid * 6];
+		y |= input[tid * 6];
 		sharedY[tid] = y;
 	}
 
 	// X calculation 
 	// Threads 32 -> 39 work here - Second warp
-	if (tid >= 32)
+	if (tid >= 32 && tid < 40)
 	{
 		// x = b4,b3,b2,b1 then b10,...,b7 i.e. tid * 6 + 4, ..., tid * 6 + 1
 		// note we reduced tid by 8, as we work with threads 8->15.
 		// i.e. (x's index) * 6 + 4, ..., (x's index) * 6 + 1
-
-		// 0,1,2,3 (meaning threads 32,...,35) together make a single x. Then, 4,...,7 etc.
-		// These are our 'thread sets' of 8. Each set will produce a value x, 8 in total. i.e. x's index will be setIndex.
 		index = tid - 32;
-		setIndex = index / 4;
-		threadPos = index % 4;
-
-		sharedOutput[index] = input[6 * setIndex + (threadPos + 1)] << threadPos;
-
-		if (threadPos == 0)
+		for (int i = 0; i < 4; i++)
 		{
-			sharedTemp[setIndex]
+			x |= input[index * 6 + (i + 1)] << i;
 		}
-		sharedTemp[setIndex] += x;
-		for (int i = 1; i < 5; i++)
-		{
-			x += input[(tid - 32) * 6 + i] << (i - 1);
-		}
-
-		//  Finally set the x values
-		if (threadPos==0)
-		{
-
-			for (int i = 0; i < 4; i++)
-			{
-				sharedX[setIndex] |= sharedOutput[index];
-			}
-
-		}
+		sharedX[index] = x;
 	}
 
-	// Y calculation 
+	// Y calculation
+	// Threads 0 -> 7 work here - First warp
+	//if (tid < 16)
+	//{
+	//	// y = b5,b0 then b11,b6, b17,b12 ... b47,b42 i.e. tid*6 + 5, tid*6
+	//	index = tid / 2;
+	//	y = (input[index * 6 + 5]) << 1;
+	//	y += input[tid * 6];
+	//	sharedY[tid] = y;
+	//}
+		
+
+	// X calculation 
+	// Threads 32 -> 39 work here - Second warp
+	//if (tid >= 32)
+	//{
+	//	// x = b4,b3,b2,b1 then b10,...,b7 i.e. tid * 6 + 4, ..., tid * 6 + 1
+	//	// note we reduced tid by 8, as we work with threads 8->15.
+	//	// i.e. (x's index) * 6 + 4, ..., (x's index) * 6 + 1
+
+	//	// 0,1,2,3 (meaning threads 32,...,35) together make a single x. Then, 4,...,7 etc.
+	//	// These are our 'thread sets' of 8. Each set will produce a value x, 8 in total. i.e. x's index will be setIndex.
+	//	//index = tid - 32;
+	//	//setIndex = index / 4;
+	//	//threadPos = index % 4;
+
+	//	//sharedOutput[tid] = input[6 * setIndex + (threadPos + 1)] << threadPos;
+
+	//	//if (threadPos == 0)
+	//	//{
+	//	//	sharedTemp[setIndex]
+	//	//}
+	//	//sharedTemp[setIndex] += x;
+	//	//for (int i = 1; i < 5; i++)
+	//	//{
+	//	//	x += input[(tid - 32) * 6 + i] << (i - 1);
+	//	//}
+
+	//	//if (threadPos==0)
+	//	//{
+	//	//	// add all the x values
+	//	//	x = sharedOutput[tid];
+	//	//	for (int i = 1; i < 4; i++)
+	//	//	{
+	//	//		x |= sharedOutput[tid+i];
+	//	//	}
+
+	//	//	//  Finally set the x values
+	//	//	sharedX[setIndex] = x;
+	//	//}
+	//}
+	
 
 
-
-	// Extract Sbox output and place it into 'input'
 	__syncthreads(); // Warps are joined here.
-	// Clean slate for input 
+
+	// Wipe input.
 	input[tid] = 0;
 	__syncthreads();
-	// Threads 0 -> 7 work here - First warp
+
+	// Extract Sbox output and place it into 'input'
+	if (tid < 32)
+	{
+		setIndex = tid / 4;
+		threadPos = tid % 4;
+		byte = d_SBoxesConst[setIndex][(sharedY[setIndex] << 4) + sharedX[setIndex]];
+		byte >>= threadPos;
+		bit = byte & 1;
+
+		input[tid] = byte & 1;
+	}
+
+	// Debug
 	if (tid < 8)
 	{
-		//return;
-		sharedOutput[tid] = d_SBoxesConst[tid][(sharedY[tid] << 4) + sharedX[tid]];
-		debugInt[tid + blockIdx.x * 150] = sharedOutput[tid];
+		debugInt[tid + blockIdx.x * 150] = d_SBoxesConst[tid][(sharedY[tid] << 4) + sharedX[tid]];
 		debugInt[tid + 8 + blockIdx.x * 150] = sharedX[tid];
 		debugInt[tid + 16 + blockIdx.x * 150] = sharedY[tid];
-		
-		//debugInt[2 + tid] = sharedOutput[tid];
 	}
 
-	// Extract 4 bits
-	// Threads 32 -> 63 work here - Second warp
-	__syncthreads();
-	int index; int outputIndex; int bitIndex;
-	unsigned char bit;
-	unsigned char byte;
-	if (tid >= 32 && tid < 64)
-	{
-		index = tid - 32;
-		outputIndex = index / 4;
-		bitIndex = (index % 4);
-		byte = sharedOutput[outputIndex];
-		byte >>= bitIndex;
-		bit = byte&1;
-		//bit = (sharedOutput[outputIndex] >> bitIndex) & 1;
 
-		// Place bits into input
-		input[index] = bit;
-	}
+	//// Threads 0 -> 7 work here - First warp
+	//if (tid < 8)
+	//{
+	//	//return;
+	//	sharedOutput[tid] = d_SBoxesConst[tid][(sharedY[tid] << 4) + sharedX[tid]];
+	//	debugInt[tid + blockIdx.x * 150] = sharedOutput[tid];
+	//	debugInt[tid + 8 + blockIdx.x * 150] = sharedX[tid];
+	//	debugInt[tid + 16 + blockIdx.x * 150] = sharedY[tid];
+	//	
+	//	//debugInt[2 + tid] = sharedOutput[tid];
+	//}
+
+	//// Extract 4 bits
+	//// Threads 32 -> 63 work here - Second warp
+	//__syncthreads();
+	//int index; int outputIndex; int bitIndex;
+	//unsigned char bit;
+	//unsigned char byte;
+	//if (tid >= 32 && tid < 64)
+	//{
+	//	index = tid - 32;
+	//	outputIndex = index / 4;
+	//	bitIndex = (index % 4);
+	//	byte = sharedOutput[outputIndex];
+	//	byte >>= bitIndex;
+	//	bit = byte&1;
+	//	//bit = (sharedOutput[outputIndex] >> bitIndex) & 1;
+
+	//	// Place bits into input
+	//	input[index] = bit;
+	//}
 
 	__syncthreads();
 }
