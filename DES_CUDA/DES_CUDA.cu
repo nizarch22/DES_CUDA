@@ -109,7 +109,6 @@ __global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, uint64_t* 
 	// Initial operations 
 	permuteMatrixCuda(input, cIP, 64); //initialPermutation(input);
 	permuteMatrixCuda(shiftedKey, cPC1, 56); // PC1 of key
-	fullShiftLCSCuda(shiftedKey);
 
 
 	for (int i = 0; i < 16; i++)
