@@ -17,7 +17,7 @@
         exit(EXIT_FAILURE); \
     } \
 } 
-#define DEBUG_ITERATION -1
+#define DEBUG_ITERATION 100
 #define NUM_TESTS 9
 #define NUM_TESTS_QUICK 4
 int main()
@@ -81,19 +81,24 @@ int main()
         endTimeInputCopy[testCount] = clock();
 
         //Debug - delete later
-        unsigned char debug[9450];
-        uint64_t debugInt[150];
-        debugInt[149] = DEBUG_ITERATION;
+        unsigned char* debug;
+        uint64_t* debugInt;
+        debug = (unsigned char*)malloc(9830400);
+        debugInt = (uint64_t*)malloc(1228800);
+        for (int i = 0; i < 1024; i++)
+        {
+            debugInt[149 * (i + 1)] = DEBUG_ITERATION;
+        }
         unsigned char* d_debug;
         uint64_t* d_debugInt;
-        cudaMalloc(&d_debug, 9450);
-        cudaMalloc(&d_debugInt, 1200);
-        cudaMemcpy(d_debugInt, debugInt, 1200, cudaMemcpyHostToDevice);
+        cudaMalloc(&d_debug, 9830400);
+        cudaMalloc(&d_debugInt, 1228800);
+        cudaMemcpy(d_debugInt, debugInt, 1228800, cudaMemcpyHostToDevice);
 
-        debugFoo << < 200, 64 >> > (d_messages, d_keys, d_resultsEncryption, d_debug, d_debugInt);
+        debugFoo << < 1024, 64 >> > (d_messages, d_keys, d_resultsEncryption, d_debug, d_debugInt);
         cudaDeviceSynchronize(); // wait for encrypt to finish
-        cudaMemcpy(&debugInt[0], d_debugInt, 1200,cudaMemcpyDeviceToHost);
-        cudaMemcpy(&debug[0], d_debug, 9450,cudaMemcpyDeviceToHost);
+        cudaMemcpy(&debug[0], d_debug, 9830400, cudaMemcpyDeviceToHost);
+        cudaMemcpy(&debugInt[0], d_debugInt, 1228800, cudaMemcpyDeviceToHost);
         cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
         cudaDeviceSynchronize(); // wait for encrypt to finish
 
@@ -206,7 +211,8 @@ int main()
         uint64_t temp;
         uint64_t debugCPU[150]; debugCPU[149] = -1;
 
-        for (int i = 0; i < 600; i++)
+        uint64_t errorCounter = 0;
+        for (int i = 0; i < 128; i++)
         {
             //EncryptDESDebug(messages[i], keys[i], temp, debugCPU);
             EncryptDES(messages[i], keys[i], temp);
@@ -214,20 +220,25 @@ int main()
             {
                 std::cout << "Ending mismatch occured. Index: " << i << "\n";
                 std::cout << temp << " != " << resultsEncryption[i] << "\n";
+                errorCounter++;
+                //cudaMemcpy(d_messages, &messages[i], 64, cudaMemcpyHostToDevice);
+                //cudaMemcpy(d_keys, &keys[i], 64, cudaMemcpyHostToDevice);
 
-                cudaMemcpy(d_messages, &messages[i], 64, cudaMemcpyHostToDevice);
-                cudaMemcpy(d_keys, &keys[i], 64, cudaMemcpyHostToDevice);
+                //debugFoo << < 1, 64 >> > (d_messages, d_keys, d_resultsEncryption, d_debug, d_debugInt);
+                //cudaDeviceSynchronize(); // wait for encrypt to finish
+                //cudaMemcpy(resultsEncryption, d_resultsEncryption, 64, cudaMemcpyDeviceToHost);
+                //cudaDeviceSynchronize(); // wait for encrypt to finish
 
-                debugFoo << < 1, 64 >> > (d_messages, d_keys, d_resultsEncryption, d_debug, d_debugInt);
-                cudaDeviceSynchronize(); // wait for encrypt to finish
-                cudaMemcpy(resultsEncryption, d_resultsEncryption, 64, cudaMemcpyDeviceToHost);
-                cudaDeviceSynchronize(); // wait for encrypt to finish
-
-                std::cout << "Singular attempt - matching check: " << i << "\n";
-                std::cout << temp << " =?= " << resultsEncryption[0] << "\n";
-                std::cout << "Result: " << ((temp == resultsEncryption[0]) ? "Success" : "Fail") << "\n";
-                return -1;
+                //std::cout << "Singular attempt - matching check: " << i << "\n";
+                //std::cout << temp << " =?= " << resultsEncryption[0] << "\n";
+                //std::cout << "Result: " << ((temp == resultsEncryption[0]) ? "Success" : "Fail") << "\n";
+                //return -1;
             }
+        }
+        if (errorCounter != 0)
+        {
+            std::cout << "Total errors encountered : " << errorCounter << "\n";
+            return -1;
         }
         std::cout << "Success! All debugging parameters match!\n";
         return 0;
