@@ -96,7 +96,7 @@ int main()
 
     //goto EVALUATE_PERFORMANCE;
 
-    for (int testCount = 8; testCount < NUM_TESTS_QUICK; testCount++)
+    for (int testCount = 0; testCount < NUM_TESTS_QUICK; testCount++)
     {
         // generating random messages and keys
         for (int i = 0; i < numMessages[testCount]; i++)
