@@ -19,7 +19,7 @@
 } 
 
 #define NUM_TESTS 9
-#define NUM_TESTS_QUICK 9
+#define NUM_TESTS_QUICK 4
 int main()
 {
     // kernel parameters
