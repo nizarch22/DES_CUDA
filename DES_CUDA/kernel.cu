@@ -23,7 +23,7 @@
 int main()
 {
     // kernel parameters
-    const int numThreads = 64;
+    const int numThreads = 128;
     const int numMessages[NUM_TESTS] = { 128,256, 512, 1024, 2048, 4096, 8192,16384,33554432 };// 524288 -  4MB - 10x speedup. 33554432 - 256MB - 70x speedup!
     // size parameters
     const int bytesMessages[NUM_TESTS] = { 1024, 2048, 4096, 8192, 16384, 32768, 65536 , 131072, 268435456 };
@@ -113,12 +113,13 @@ int main()
         //// Run Encryption & Decryption in CUDA stage ////
         // Encrypt the messages using EncryptDESCuda. 
         startTimeExecute[testCount] = clock();
-        EncryptDESCuda << < numMessages[testCount], numThreads >> > (d_messages, d_keys, d_resultsEncryption);
+        const int blockNum = (numMessages[testCount] >> 1);
+        EncryptDESCuda << < blockNum, numThreads >> > (d_messages, d_keys, d_resultsEncryption);
         cudaDeviceSynchronize(); // wait for encrypt to finish
 
         // Decrypt all the encryption made by EncryptDesCuda above using DecryptDESCuda.
-        //DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
-        //cudaDeviceSynchronize();
+        DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
+        cudaDeviceSynchronize();
         endTimeExecute[testCount] = clock();
 
         // cuda copy results 

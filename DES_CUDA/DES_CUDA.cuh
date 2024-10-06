@@ -3,7 +3,7 @@
 // External
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-
+#include <assert.h>
 __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* results);
 __global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, uint64_t* results);
 
