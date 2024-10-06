@@ -31,7 +31,9 @@ int main()
 
     const int bytesLargest = 268435456;
     //// Kernel arguments prep stage ////
-    // prep keys, messages, encryptions, decryptions
+    // prep matrices, sboxes
+    const unsigned char* matrices[7] = { IP,PC1,PC2, E, PMatrix,IPInverse, LCS };
+    const int matricesSizes[7] = { 64,56,48,48,32,64,16 };
     uint64_t* d_messages, * d_keys;
     uint64_t* messages = (uint64_t*)malloc(bytesLargest);
     uint64_t* keys = (uint64_t*)malloc(bytesLargest);
@@ -71,7 +73,15 @@ int main()
     //    keys[i] = (((uint64_t)rand()) << 32) | rand();
     //}
 
-    //// cuda copy memory - messages, keys
+    // cuda copy memory - matrices, sboxes
+    cudaMemcpyToSymbol(d_SBoxesConst, &SBoxes[0][0], 512, 0, cudaMemcpyHostToDevice);;
+    int offset = 0;
+    for (int i = 0; i < 7; i++)
+    {
+        cudaMemcpyToSymbol(d_matricesConst, &matrices[i][0], matricesSizes[i], offset, cudaMemcpyHostToDevice);;
+        //cudaMemcpy(d_matrices + offset, &matrices[i][0], matricesSizes[i], cudaMemcpyHostToDevice);
+        offset += matricesSizes[i];
+    }
     //startTimeInputCopy[0] = clock();
     //cudaMemcpy(d_messages, messages, bytesLargest, cudaMemcpyHostToDevice);
     //cudaMemcpy(d_keys, keys, bytesLargest, cudaMemcpyHostToDevice);
@@ -117,8 +127,8 @@ int main()
         cudaDeviceSynchronize(); // wait for encrypt to finish
 
         // Decrypt all the encryption made by EncryptDesCuda above using DecryptDESCuda.
-        //DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
-        //cudaDeviceSynchronize();
+        DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
+        cudaDeviceSynchronize();
         endTimeExecute[testCount] = clock();
 
         // cuda copy results 
@@ -126,6 +136,7 @@ int main()
         cudaMemcpy(resultsDecryption, d_resultsDecryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
         endTimeRetrieveResults[testCount] = clock();
 
+        CHECK_CUDA_ERROR(cudaGetLastError());
         // cuda check for errors in CUDA execution
 
         //for (int i = 0; i < numMessages[testCount]; i++)
@@ -133,7 +144,6 @@ int main()
         //    bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
         //}
     }
-    CHECK_CUDA_ERROR(cudaGetLastError());
 
 
 
