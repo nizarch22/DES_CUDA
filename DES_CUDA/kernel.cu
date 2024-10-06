@@ -127,8 +127,8 @@ int main()
         cudaDeviceSynchronize(); // wait for encrypt to finish
 
         // Decrypt all the encryption made by EncryptDesCuda above using DecryptDESCuda.
-        DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
-        cudaDeviceSynchronize();
+        //DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
+        //cudaDeviceSynchronize();
         endTimeExecute[testCount] = clock();
 
         // cuda copy results 
@@ -239,6 +239,8 @@ EVALUATE_PERFORMANCE:
     CHECK_CUDA_ERROR(cudaFree(d_keys));
     CHECK_CUDA_ERROR(cudaFree(d_resultsEncryption));
     CHECK_CUDA_ERROR(cudaFree(d_resultsDecryption));
-
+    //int a;
+    //cudaOccupancyMaxActiveBlocksPerMultiprocessor(&a, EncryptDESCuda, 32, 0);
+    //std::cout << "Number of resident blocks: " << a << "\n";
     return 0;
 }
