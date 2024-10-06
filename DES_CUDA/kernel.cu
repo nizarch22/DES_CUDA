@@ -31,6 +31,9 @@ int main()
 
     const int bytesLargest = 268435456;
     //// Kernel arguments prep stage ////
+    // prep matrices, sboxes
+    const unsigned char* matrices[7] = { IP,PC1,PC2, E, PMatrix,IPInverse, LCS };
+    const int matricesSizes[7] = { 64,56,48,48,32,64,16 };
     // prep keys, messages, encryptions, decryptions
     uint64_t* d_messages, * d_keys;
     uint64_t* messages = (uint64_t*)malloc(bytesLargest);
@@ -62,39 +65,16 @@ int main()
     int startTimeInputCopy[NUM_TESTS] = {0}; int endTimeInputCopy[NUM_TESTS] = { 0 };
     int startTimeExecute[NUM_TESTS] = { 0 }; int endTimeExecute[NUM_TESTS] = { 0 };
     int endTimeRetrieveResults[NUM_TESTS] = { 0 };
-    //int startTimeCPU[NUM_TESTS]; int endTimeCPU[NUM_TESTS];
-    
-    // Generate messages - 256MB
-    //for (int i = 0; i < 33554432; i++)
-    //{
-    //    messages[i] = (((uint64_t)rand()) << 32) | rand();
-    //    keys[i] = (((uint64_t)rand()) << 32) | rand();
-    //}
 
-    //// cuda copy memory - messages, keys
-    //startTimeInputCopy[0] = clock();
-    //cudaMemcpy(d_messages, messages, bytesLargest, cudaMemcpyHostToDevice);
-    //cudaMemcpy(d_keys, keys, bytesLargest, cudaMemcpyHostToDevice);
-    //endTimeInputCopy[0] = clock();
-
-    //startTimeExecute[0] = clock();
-    //for (int i = 0; i < 33554432 / 1024; i++)
-    //{
-    //    EncryptDESCuda << < 1024, numThreads >> > (d_messages, d_keys, d_resultsEncryption, i*1024);
-    //    // Decrypt all the encryption made by EncryptDesCuda above using DecryptDESCuda.
-    //    //DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
-    //    //cudaDeviceSynchronize();
-    //}
-    //cudaDeviceSynchronize(); // wait for encrypt to finish
-    //endTimeExecute[0] = clock();
-    //CHECK_CUDA_ERROR(cudaGetLastError());
-
-    //// cuda copy results 
-    //cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesLargest, cudaMemcpyDeviceToHost);
-    //cudaMemcpy(resultsDecryption, d_resultsDecryption, bytesLargest, cudaMemcpyDeviceToHost);
-    //endTimeRetrieveResults[0] = clock();
-
-    //goto EVALUATE_PERFORMANCE;
+    // cuda copy memory - matrices, sboxes
+    cudaMemcpyToSymbol(d_SBoxesConst, &SBoxes[0][0], 512, 0, cudaMemcpyHostToDevice);;
+    int offset = 0;
+    for (int i = 0; i < 7; i++)
+    {
+        cudaMemcpyToSymbol(d_matricesConst, &matrices[i][0], matricesSizes[i], offset, cudaMemcpyHostToDevice);;
+        //cudaMemcpy(d_matrices + offset, &matrices[i][0], matricesSizes[i], cudaMemcpyHostToDevice);
+        offset += matricesSizes[i];
+    }
 
     for (int testCount = 0; testCount < NUM_TESTS_QUICK; testCount++)
     {
@@ -118,14 +98,16 @@ int main()
         cudaDeviceSynchronize(); // wait for encrypt to finish
 
         // Decrypt all the encryption made by EncryptDesCuda above using DecryptDESCuda.
-        DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
-        cudaDeviceSynchronize();
+        //DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
+        //cudaDeviceSynchronize();
         endTimeExecute[testCount] = clock();
 
         // cuda copy results 
         cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
         cudaMemcpy(resultsDecryption, d_resultsDecryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
         endTimeRetrieveResults[testCount] = clock();
+
+        CHECK_CUDA_ERROR(cudaGetLastError());
 
         // cuda check for errors in CUDA execution
 
@@ -134,7 +116,6 @@ int main()
         //    bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
         //}
     }
-    CHECK_CUDA_ERROR(cudaGetLastError());
 
 
 
@@ -159,7 +140,6 @@ int main()
     // Calculate timings for CUDA, CPU execution. 
     // CUDA has 2 timing calculations: one with allocation time and one without. The reason is that the allocation time is very big, and impactful for small input data (where CPU performs better than the GPU).
     //int CPUTime;
-EVALUATE_PERFORMANCE:
     int CUDATime, CUDATimeCopy, CUDATimeExecute;
     int CUDATimeAlloc = endTimeAlloc - startTimeAlloc;
     
