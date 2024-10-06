@@ -19,7 +19,7 @@
 } 
 
 #define NUM_TESTS 9
-#define NUM_TESTS_QUICK 9
+#define NUM_TESTS_QUICK 1
 int main()
 {
     // kernel parameters
@@ -128,16 +128,21 @@ int main()
         //}
     }
 
+    ////// GPU-CPU encryption-decryption validation stage ////
+    for (int i = 0; i < numMessages[0]; i++)
+    {
+        bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
+    }
     //if (!bEqualEncrypt)
     //{
     //    std::cout << "CPU-GPU Encryption comparison failed!\n";
     //    return 0;
-    //}
-    //if (!bEqualDecrypt)
-    //{
-    //    std::cout << "Decryption-message comparison failed!\n";
-    //    return 0;
-    //}
+    //} 
+    if (!bEqualDecrypt)
+    {
+        std::cout << "Decryption-message comparison failed!\n";
+        return 0;
+    }
 
     //if (bEqualDecrypt && bEqualEncrypt)
     //{
