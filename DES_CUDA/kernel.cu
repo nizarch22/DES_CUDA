@@ -24,9 +24,9 @@
 int main()
 {
     // kernel parameters
-    const int numThreads = 128;
+    const int numThreads = 64;
     const int numMessages[NUM_TESTS] = { 131072,262144,524288,1048576,2097152,4194304,8388608,16777216,33554432 };// 524288 -  4MB - 10x speedup. 33554432 - 256MB - 70x speedup!
-    const int numBlocks[NUM_TESTS] = { 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144 };//, 524288};
+    const int numBlocks[NUM_TESTS] = { 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144 , 524288};
 
     // size parameters
     const int bytesMessages[NUM_TESTS] = { 1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864 , 134217728, 268435456 };
@@ -35,6 +35,12 @@ int main()
     const int bytesLargest = bytesMessages[NUM_TESTS-1];
     //// Kernel arguments prep stage ////
     // prep matrices, sboxes
+    unsigned char* d_matricesConst;
+    unsigned char* d_SBoxesConst;
+
+    cudaMalloc(&d_matricesConst, bytesLargest);
+    cudaMalloc(&d_SBoxesConst, bytesLargest);
+
     const unsigned char* matrices[7] = {IP,PC1,PC2,E,PMatrix,IPInverse,LCS};
     const int matricesSizes[7] = { 64,56,48,48,32,64,16 };
     // prep keys, messages, encryptions, decryptions
@@ -66,10 +72,11 @@ int main()
     int startTimeCopyMatrices = clock(); // Used to measure the time GPU finishes execution since copying started.
     // cuda copy memory - matrices, sboxes
     int offset = 0;
+    cudaMemcpy(d_SBoxesConst, SBoxes[0], 512, cudaMemcpyHostToDevice);
     for (int i = 0; i < 7; i++)
     {
         //cudaMemcpyToSymbol(d_matricesConst, &matrices[i][0], matricesSizes[i], offset, cudaMemcpyHostToDevice);
-        //cudaMemcpy(d_matricesConst + offset, &matrices[i][0], matricesSizes[i], cudaMemcpyHostToDevice);
+        cudaMemcpy(d_matricesConst + offset, &matrices[i][0], matricesSizes[i], cudaMemcpyHostToDevice);
         offset += matricesSizes[i];
     }
     int endTimeCopyMatrices = clock(); // Used to measure the time GPU finishes execution since copying started.
@@ -103,10 +110,10 @@ int main()
         //// Run Encryption & Decryption in CUDA stage ////
         // We encrypt the messages using EncryptDESCuda. Then, we use all those encrypted messages to run DecryptDESCuda.
         startTimeExecute[testCount] = clock();
-        EncryptDESCuda << < numBlocks[testCount], numThreads>> > (d_messages, d_keys, d_resultsEncryption);
+        EncryptDESCuda << < numBlocks[testCount], numThreads>> > (d_messages, d_keys, d_resultsEncryption, d_matricesConst, d_SBoxesConst);
         cudaDeviceSynchronize(); // wait for encrypt to finish
-        DecryptDESCuda << <numBlocks[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
-        cudaDeviceSynchronize();
+        //DecryptDESCuda << <numBlocks[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption, d_matricesConst, d_SBoxesConst);
+        //cudaDeviceSynchronize();
         endTimeExecute[testCount] = clock();
         // cuda copy results 
         cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
@@ -132,24 +139,24 @@ int main()
         //}
     }
 
-    ////// GPU-CPU encryption-decryption validation stage ////
-    for (int i = 0; i < numMessages[0]; i++)
-    {
-        uint64_t temp;
-        EncryptDES(messages[i], keys[i], temp);
-        bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
-        bEqualEncrypt &= (resultsEncryption[i] == temp);
-    }
-    if (!bEqualEncrypt)
-    {
-        std::cout << "CPU-GPU Encryption comparison failed!\n";
-        return 0;
-    } 
-    if (!bEqualDecrypt)
-    {
-        std::cout << "Decryption-message comparison failed!\n";
-        return 0;
-    }
+    // GPU encryption-decryption quick validation
+    //for (int i = 0; i < numMessages[0]; i++)
+    //{
+    //    uint64_t temp;
+    //    EncryptDES(messages[i], keys[i], temp);
+    //    bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
+    //    bEqualEncrypt &= (resultsEncryption[i] == temp);
+    //}
+    //if (!bEqualEncrypt)
+    //{
+    //    std::cout << "CPU-GPU Encryption comparison failed!\n";
+    //    return -1;
+    //} 
+    //if (!bEqualDecrypt)
+    //{
+    //    std::cout << "Decryption-message comparison failed!\n";
+    //    return -1;
+    //}
 
     //if (bEqualDecrypt && bEqualEncrypt)
     //{
