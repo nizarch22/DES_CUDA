@@ -20,7 +20,7 @@
 
 
 #define NUM_TESTS 9
-#define NUM_TESTS_QUICK 1
+#define NUM_TESTS_QUICK 9
 int main()
 {
     // kernel parameters
@@ -35,8 +35,6 @@ int main()
     const int bytesLargest = bytesMessages[NUM_TESTS-1];
     //// Kernel arguments prep stage ////
     // prep matrices, sboxes
-
-
     const unsigned char* matrices[7] = {IP,PC1,PC2,E,PMatrix,IPInverse,LCS};
     const int matricesSizes[7] = { 64,56,48,48,32,64,16 };
     // prep keys, messages, encryptions, decryptions
@@ -105,9 +103,9 @@ int main()
         //// Run Encryption & Decryption in CUDA stage ////
         // We encrypt the messages using EncryptDESCuda. Then, we use all those encrypted messages to run DecryptDESCuda.
         startTimeExecute[testCount] = clock();
-        EncryptDESCuda << < numBlocks[testCount], numThreads>> > (d_messages, d_keys, d_resultsEncryption, d_matricesConst);
+        EncryptDESCuda << < numBlocks[testCount], numThreads>> > (d_messages, d_keys, d_resultsEncryption);
         cudaDeviceSynchronize(); // wait for encrypt to finish
-        DecryptDESCuda << <numBlocks[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption, d_matricesConst, d_SBoxesConst);
+        DecryptDESCuda << <numBlocks[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
         cudaDeviceSynchronize();
         endTimeExecute[testCount] = clock();
         // cuda copy results 
