@@ -18,6 +18,7 @@
     } \
 } 
 
+
 #define NUM_TESTS 9
 #define NUM_TESTS_QUICK 1
 int main()
@@ -34,7 +35,9 @@ int main()
     const int bytesLargest = bytesMessages[NUM_TESTS-1];
     //// Kernel arguments prep stage ////
     // prep matrices, sboxes
-    const unsigned char* matrices[7] = {IP,PC1,PC2, E, PMatrix,IPInverse, LCS};
+
+
+    const unsigned char* matrices[7] = {IP,PC1,PC2,E,PMatrix,IPInverse,LCS};
     const int matricesSizes[7] = { 64,56,48,48,32,64,16 };
     // prep keys, messages, encryptions, decryptions
     uint64_t* d_messages, * d_keys;
@@ -57,19 +60,22 @@ int main()
     cudaMalloc(&d_resultsEncryption, bytesLargest);
     cudaMalloc(&d_resultsDecryption, bytesLargest);
 
+    // Check memory allocation errors
+    CHECK_CUDA_ERROR(cudaGetLastError()); 
+
     int endTimeAlloc = clock();
 
     int startTimeCopyMatrices = clock(); // Used to measure the time GPU finishes execution since copying started.
     // cuda copy memory - matrices, sboxes
-    cudaMemcpyToSymbol(d_SBoxesConst, &SBoxes[0][0], 512, 0, cudaMemcpyHostToDevice);;
     int offset = 0;
     for (int i = 0; i < 7; i++)
     {
-        cudaMemcpyToSymbol(d_matricesConst, &matrices[i][0], matricesSizes[i], offset, cudaMemcpyHostToDevice);;
-        //cudaMemcpy(d_matrices + offset, &matrices[i][0], matricesSizes[i], cudaMemcpyHostToDevice);
+        //cudaMemcpyToSymbol(d_matricesConst, &matrices[i][0], matricesSizes[i], offset, cudaMemcpyHostToDevice);
+        //cudaMemcpy(d_matricesConst + offset, &matrices[i][0], matricesSizes[i], cudaMemcpyHostToDevice);
         offset += matricesSizes[i];
     }
     int endTimeCopyMatrices = clock(); // Used to measure the time GPU finishes execution since copying started.
+    CHECK_CUDA_ERROR(cudaGetLastError());
 
 
     // verification parameters
@@ -99,9 +105,9 @@ int main()
         //// Run Encryption & Decryption in CUDA stage ////
         // We encrypt the messages using EncryptDESCuda. Then, we use all those encrypted messages to run DecryptDESCuda.
         startTimeExecute[testCount] = clock();
-        EncryptDESCuda << < numBlocks[testCount], numThreads>> > (d_messages, d_keys, d_resultsEncryption);
+        EncryptDESCuda << < numBlocks[testCount], numThreads>> > (d_messages, d_keys, d_resultsEncryption, d_matricesConst);
         cudaDeviceSynchronize(); // wait for encrypt to finish
-        DecryptDESCuda << <numBlocks[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
+        DecryptDESCuda << <numBlocks[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption, d_matricesConst, d_SBoxesConst);
         cudaDeviceSynchronize();
         endTimeExecute[testCount] = clock();
         // cuda copy results 
@@ -131,13 +137,16 @@ int main()
     ////// GPU-CPU encryption-decryption validation stage ////
     for (int i = 0; i < numMessages[0]; i++)
     {
+        uint64_t temp;
+        EncryptDES(messages[i], keys[i], temp);
         bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
+        bEqualEncrypt &= (resultsEncryption[i] == temp);
     }
-    //if (!bEqualEncrypt)
-    //{
-    //    std::cout << "CPU-GPU Encryption comparison failed!\n";
-    //    return 0;
-    //} 
+    if (!bEqualEncrypt)
+    {
+        std::cout << "CPU-GPU Encryption comparison failed!\n";
+        return 0;
+    } 
     if (!bEqualDecrypt)
     {
         std::cout << "Decryption-message comparison failed!\n";
