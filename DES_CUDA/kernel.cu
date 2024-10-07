@@ -119,8 +119,8 @@ int main()
         cudaDeviceSynchronize(); // wait for encrypt to finish
 
         // Decrypt all the encryption made by EncryptDesCuda above using DecryptDESCuda.
-        //DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption, d_matricesConst, d_SBoxesConst);
-        //cudaDeviceSynchronize();
+        DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption, d_matricesConst, d_SBoxesConst);
+        cudaDeviceSynchronize();
         endTimeExecute[testCount] = clock();
 
         // cuda copy results 
@@ -137,14 +137,17 @@ int main()
         //}
     }
 
+    // Quick validation
+    for (int i = 0; i < numMessages[0]; i++)
+    {
+        bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
+    }
 
-
-
-    //if (!bEqualDecrypt)
-    //{
-    //    std::cout << "GPU Decryption comparison failed!\n";
-    //    return 0;
-    //}
+    if (!bEqualDecrypt)
+    {
+        std::cout << "GPU Decryption comparison failed!\n";
+        return -1;
+    }
     //if (!bEqualDecrypt)
     //{
     //    std::cout << "Decryption-message comparison failed!\n";
