@@ -32,7 +32,13 @@ int main()
     const int bytesLargest = 268435456;
     //// Kernel arguments prep stage ////
     // prep matrices, sboxes
-    const unsigned char* matrices[7] = { IP,PC1,PC2, E, PMatrix,IPInverse, LCS };
+    unsigned char* d_matricesConst;
+    unsigned char* d_SBoxesConst;
+
+    cudaMalloc(&d_matricesConst, bytesLargest);
+    cudaMalloc(&d_SBoxesConst, bytesLargest);
+
+    const unsigned char* matrices[7] = { IP,PC1,PC2,E,PMatrix,IPInverse,LCS };
     const int matricesSizes[7] = { 64,56,48,48,32,64,16 };
     // prep keys, messages, encryptions, decryptions
     uint64_t* d_messages, * d_keys;
@@ -67,14 +73,18 @@ int main()
     int endTimeRetrieveResults[NUM_TESTS] = { 0 };
 
     // cuda copy memory - matrices, sboxes
-    cudaMemcpyToSymbol(d_SBoxesConst, &SBoxes[0][0], 512, 0, cudaMemcpyHostToDevice);;
+    int startTimeCopyMatrices = clock(); // Used to measure the time GPU finishes execution since copying started.
+    // cuda copy memory - matrices, sboxes
     int offset = 0;
+    cudaMemcpy(d_SBoxesConst, SBoxes[0], 512, cudaMemcpyHostToDevice);
     for (int i = 0; i < 7; i++)
     {
-        cudaMemcpyToSymbol(d_matricesConst, &matrices[i][0], matricesSizes[i], offset, cudaMemcpyHostToDevice);;
-        //cudaMemcpy(d_matrices + offset, &matrices[i][0], matricesSizes[i], cudaMemcpyHostToDevice);
+        //cudaMemcpyToSymbol(d_matricesConst, &matrices[i][0], matricesSizes[i], offset, cudaMemcpyHostToDevice);
+        cudaMemcpy(d_matricesConst + offset, &matrices[i][0], matricesSizes[i], cudaMemcpyHostToDevice);
         offset += matricesSizes[i];
     }
+    int endTimeCopyMatrices = clock(); // Used to measure the time GPU finishes execution since copying started.
+    CHECK_CUDA_ERROR(cudaGetLastError());
 
     for (int testCount = 0; testCount < NUM_TESTS_QUICK; testCount++)
     {
@@ -94,11 +104,11 @@ int main()
         // Encrypt the messages using EncryptDESCuda. 
         startTimeExecute[testCount] = clock();
         const int blockNum = (numMessages[testCount] >> 1);
-        EncryptDESCuda << < blockNum, numThreads >> > (d_messages, d_keys, d_resultsEncryption);
+        EncryptDESCuda << < blockNum, numThreads >> > (d_messages, d_keys, d_resultsEncryption, d_matricesConst, d_SBoxesConst);
         cudaDeviceSynchronize(); // wait for encrypt to finish
 
         // Decrypt all the encryption made by EncryptDesCuda above using DecryptDESCuda.
-        //DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
+        //DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption, d_matricesConst, d_SBoxesConst);
         //cudaDeviceSynchronize();
         endTimeExecute[testCount] = clock();
 
@@ -144,29 +154,6 @@ int main()
     int CUDATimeAlloc = endTimeAlloc - startTimeAlloc;
     
     double throughput, speedup, speedupExecute;
-
-    //CUDATimeExecute = endTimeExecute[0] - startTimeExecute[0];
-    //CUDATimeCopy = CUDATimeExecute + endTimeInputCopy[0] - startTimeInputCopy[0];
-    //CUDATime = CUDATimeCopy + CUDATimeAlloc;
-    ////CPUTime = endTimeCPU[i] - startTimeCPU[i];
-    //// printout of timing results
-    //std::cout << "Total messages size: " << (bytesLargest >> 20) << " MegaBytes\n";
-    //std::cout << "Total timing measurements:\n";
-    //std::cout << "GPU - only kernel execution: " << CUDATimeExecute << "ms\n";
-    //std::cout << "GPU - with copying: " << CUDATimeCopy << "ms\n";
-    //std::cout << "GPU - with allocation and copying: " << CUDATime << "ms\n";
-    ////std::cout << "CPU: " << CPUTime << "ms\n";
-
-    //throughput = 1000.0f * (float)(bytesLargest >> 17) / CUDATimeExecute;
-    ////speedup = (float)CPUTime / CUDATime;
-    ////speedupExecute = (float)CPUTime / CUDATimeExecute;
-    //std::cout << "Speed measurements:\n";
-    //std::cout << "GPU - Execution speed: " << throughput << " MegaBits per second\n";
-
-    //std::cout << "Speedup measurements:\n";
-    //std::cout << "Speedup - Execution: " << speedupExecute << "\n";
-    //std::cout << "Speedup - with allocation and copy: " << speedup << "\n";
-
 
     std::cout << "CUDA Debug results:\n";
     for (int i = 0; i < NUM_TESTS_QUICK; i++)

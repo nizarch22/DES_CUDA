@@ -8,8 +8,7 @@
 #include <cooperative_groups.h>
 using namespace cooperative_groups;
 __device__ void swapLRCuda(unsigned char* input, unsigned char* sharedCopy); // Swap left (32 bit) and right (32 bit) parts of the 64 bit input.
-__device__ void substituteCuda(unsigned char* input, uint16_t* sharedX, uint16_t* sharedY, unsigned char* sharedOutput);
-__device__ void substituteCudaDebug(unsigned char* input, uint16_t* sharedX, uint16_t* sharedY, unsigned char* sharedOutput, unsigned char* debug, uint64_t* debugInt);
+__device__ void substituteCuda(unsigned char* input, uint16_t* sharedX, uint16_t* sharedY, const unsigned char* d_SBoxesConst);
 __device__ void leftCircularShiftCuda(unsigned char* input, unsigned char* sharedCopy, uint8_t times);
 __device__ void rightCircularShiftCuda(unsigned char* input, unsigned char* sharedCopy, uint8_t times);
 __device__ void permuteMatrixCuda(unsigned char* input, unsigned char* sharedCopy, const unsigned char* P, const unsigned int size);
@@ -21,7 +20,7 @@ __device__ void copy(unsigned char* debug, unsigned char* target, int num)
 	__syncthreads();
 }
 
-__global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* results)
+__global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* results, const unsigned char* d_matricesConst, const unsigned char* d_SBoxesConst)
 {
 	// Kernel iterations shared memory
 	__shared__ unsigned char sharedInput[128];
@@ -101,7 +100,7 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* res
 		__syncthreads();
 
 		// Substitution S-boxes
-		substituteCuda(sharedInput, sharedX, sharedY, sharedCopy);
+		substituteCuda(sharedInput, sharedX, sharedY, d_SBoxesConst);
 
 		// "P-matrix" permutation i.e. mix/shuffle
 		permuteMatrixCuda(sharedInput, sharedCopy, &d_matricesConst[matricesIndices[4]], 32);// mixPermutation(input);
@@ -134,7 +133,7 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* res
 	__syncthreads();
 }
 //
-__global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, uint64_t* results)
+__global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, uint64_t* results, const unsigned char* d_matricesConst, const unsigned char* d_SBoxesConst)
 {
 	// Kernel iterations shared memory
 	__shared__ unsigned char sharedInput[128];
@@ -216,7 +215,7 @@ __global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, uint64_t* 
 		__syncthreads();
 
 		// Substitution S-boxes
-		substituteCuda(sharedInput, sharedX, sharedY, sharedCopy);
+		substituteCuda(sharedInput, sharedX, sharedY, d_SBoxesConst);
 
 		// "P-matrix" permutation i.e. mix/shuffle
 		permuteMatrixCuda(sharedInput, sharedCopy, &d_matricesConst[matricesIndices[4]], 32);// mixPermutation(input);
@@ -309,7 +308,7 @@ __device__ void rightCircularShiftCuda(unsigned char* input, unsigned char* shar
 	__syncthreads();
 }
 
-__device__ void substituteCuda(unsigned char* input, uint16_t* sharedX, uint16_t* sharedY, unsigned char* sharedOutput)
+__device__ void substituteCuda(unsigned char* input, uint16_t* sharedX, uint16_t* sharedY, const unsigned char* d_SBoxesConst)
 {
 	// 16 inputs (8 x,y pairs) and 8 outputs - 8 extractions from SBox. 
 	// 64 threads will allow for 8 simulataneous extractions.
