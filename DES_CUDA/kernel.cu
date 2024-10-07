@@ -24,10 +24,11 @@ int main()
 {
     // kernel parameters
     const int numThreads = 128;
-    const int numMessages[NUM_TESTS] = { 128,256, 512, 1024, 2048, 4096, 8192,16384,33554432 };// 524288 -  4MB - 10x speedup. 33554432 - 256MB - 70x speedup!
+    const int numMessages[NUM_TESTS] = { 131072,262144, 524288, 1048576, 2097152, 4194304, 8388608,16777216,33554432 };// 524288 -  4MB - 10x speedup. 33554432 - 256MB - 70x speedup!
     // size parameters
-    const int bytesMessages[NUM_TESTS] = { 1024, 2048, 4096, 8192, 16384, 32768, 65536 , 131072, 268435456 };
-    const int bytesKeys[NUM_TESTS] = { 1024, 2048, 4096, 8192, 16384, 32768, 65536 , 131072, 268435456 }; // change for keys
+    const int bytesMessages[NUM_TESTS] = { 1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864 , 134217728, 268435456 }; // change for keys
+    const int bytesKeys[NUM_TESTS] = { 1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864 , 134217728, 268435456 }; // change for keys
+
 
     const int bytesLargest = 268435456;
     //// Kernel arguments prep stage ////
