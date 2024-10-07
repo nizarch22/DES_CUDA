@@ -13,16 +13,21 @@ __device__ void leftCircularShiftCuda(uint32_t& input, uint8_t times);
 __device__ void generateShiftedKeyCuda(const int& index, uint64_t& roundKey, const unsigned char* cLCS);
 __device__ void permuteMatrixCuda(uint64_t& input, const unsigned char* P, const unsigned int size);
 
-__launch_bounds__(128,3)
 __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* results, const unsigned char* d_matricesConst, const unsigned char* d_SBoxesConst)
 {
 	int tid = threadIdx.x + blockIdx.x * blockDim.x;
+	tid <<= 1;
 	uint64_t result; // setting alias for encryption
+	uint64_t result2; // setting alias for encryption
 
 	uint64_t input = messages[tid];
+	uint64_t input2 = messages[tid+1];
 	uint64_t shiftedKey = keys[tid];
+	uint64_t shiftedKey2 = keys[tid+1];
+	uint64_t permutedRoundKey2;
 	uint64_t permutedRoundKey;
 	uint64_t left; // last 32 bits of plaintext/input to algorithm are preserved in this variable 
+	uint64_t left2; // last 32 bits of plaintext/input to algorithm are preserved in this variable 
 
 	// loading matrices variable
 	//int matricesIndices[7] = { 0,64,120,168,216,248,312 };
@@ -37,37 +42,52 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* res
 		// Preserving L,R.
 		// preserve right side (Result[63:32] = Input[31:0])
 		result = input;
+		result2 = input2;
 		result <<= 32;
+		result2 <<= 32;
 		// preserve left side
 		left = input >> 32;
+		left2 = input2 >> 32;
 
 		// Round key
 		generateShiftedKeyCuda(i, shiftedKey, &d_matricesConst[312]);
+		generateShiftedKeyCuda(i, shiftedKey2, &d_matricesConst[312]);
 		permutedRoundKey = shiftedKey;
+		permutedRoundKey2 = shiftedKey2;
 		permuteMatrixCuda(permutedRoundKey, &d_matricesConst[120], 48);//roundKeyPermutation(permutedRoundKey);
+		permuteMatrixCuda(permutedRoundKey2, &d_matricesConst[120], 48);//roundKeyPermutation(permutedRoundKey);
 
 		// Expansion permutation
 		permuteMatrixCuda(input, &d_matricesConst[168], 48);//expandPermutation(input); // 48 bits
+		permuteMatrixCuda(input2, &d_matricesConst[168], 48);//expandPermutation(input); // 48 bits
 
 		// XOR with permuted round key
 		input ^= permutedRoundKey;
+		input2 ^= permutedRoundKey2;
 
 		// Substitution S-boxes
 		substituteCuda(input, d_SBoxesConst); // 32 bits
+		substituteCuda(input2, d_SBoxesConst); // 32 bits
 
 		// "P-matrix" permutation i.e. mix/shuffle
 		permuteMatrixCuda(input, &d_matricesConst[216], 32);// mixPermutation(input);
+		permuteMatrixCuda(input2, &d_matricesConst[216], 32);// mixPermutation(input);
 
 		// XOR with preserved left side
 		result += left ^ input; // Result[31:0] = L XOR f[31:0];
+		result2 += left2 ^ input2; // Result[31:0] = L XOR f[31:0];
 
 		// End of loop
 		input = result;
+		input2 = result2;
 	}
 
 	swapLRCuda(result);
+	swapLRCuda(result2);
 	permuteMatrixCuda(result, &d_matricesConst[248], 64);//reverseInitialPermutation(result);
+	permuteMatrixCuda(result2, &d_matricesConst[248], 64);//reverseInitialPermutation(result);
 	results[tid] = result;
+	results[tid+1] = result2;
 }
 __global__ void DecryptDESCuda(uint64_t* encryptions, uint64_t* keys, uint64_t* results, const unsigned char* d_matricesConst, const unsigned char* d_SBoxesConst)
 {

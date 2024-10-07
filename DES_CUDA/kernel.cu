@@ -26,7 +26,7 @@ int main()
     // kernel parameters
     const int numThreads = 128;
     const int numMessages[NUM_TESTS] = { 131072,262144,524288,1048576,2097152,4194304,8388608,16777216,33554432 };// 524288 -  4MB - 10x speedup. 33554432 - 256MB - 70x speedup!
-    const int numBlocks[NUM_TESTS] = { 1024,2048,4096, 8192, 16384, 32768, 65536, 131072, 262144 };//, 524288, 1048576 };
+    const int numBlocks[NUM_TESTS] = { 512,1024,2048,4096, 8192, 16384, 32768, 65536, 131072 };//, 262144 };//, 524288, 1048576 };
 
     // size parameters
     const int bytesMessages[NUM_TESTS] = { 1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864 , 134217728, 268435456 };
