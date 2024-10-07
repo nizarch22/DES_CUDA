@@ -139,7 +139,7 @@ int main()
         //}
     }
 
-    // GPU encryption-decryption quick validation
+     // GPU encryption-decryption quick validation
     //for (int i = 0; i < numMessages[0]; i++)
     //{
     //    uint64_t temp;
