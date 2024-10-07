@@ -30,10 +30,18 @@ int main()
     const int bytesKeys[NUM_TESTS] = { 1024, 2048, 4096, 8192, 16384, 32768, 65536 , 131072, 268435456 }; // change for keys
 
     const int bytesLargest = 268435456;
+
     //// Kernel arguments prep stage ////
     // prep matrices, sboxes
-    const unsigned char* matrices[7] = { IP,PC1,PC2, E, PMatrix,IPInverse, LCS };
+    unsigned char* d_matricesConst;
+    unsigned char* d_SBoxesConst;
+
+    cudaMalloc(&d_matricesConst, bytesLargest);
+    cudaMalloc(&d_SBoxesConst, bytesLargest);
+
+    const unsigned char* matrices[7] = { IP,PC1,PC2,E,PMatrix,IPInverse,LCS };
     const int matricesSizes[7] = { 64,56,48,48,32,64,16 };
+
     uint64_t* d_messages, * d_keys;
     uint64_t* messages = (uint64_t*)malloc(bytesLargest);
     uint64_t* keys = (uint64_t*)malloc(bytesLargest);
@@ -74,37 +82,21 @@ int main()
     //}
 
     // cuda copy memory - matrices, sboxes
-    cudaMemcpyToSymbol(d_SBoxesConst, &SBoxes[0][0], 512, 0, cudaMemcpyHostToDevice);;
+
+
+
+    int startTimeCopyMatrices = clock(); // Used to measure the time GPU finishes execution since copying started.
+    // cuda copy memory - matrices, sboxes
     int offset = 0;
+    cudaMemcpy(d_SBoxesConst, SBoxes[0], 512, cudaMemcpyHostToDevice);
     for (int i = 0; i < 7; i++)
     {
-        cudaMemcpyToSymbol(d_matricesConst, &matrices[i][0], matricesSizes[i], offset, cudaMemcpyHostToDevice);;
-        //cudaMemcpy(d_matrices + offset, &matrices[i][0], matricesSizes[i], cudaMemcpyHostToDevice);
+        //cudaMemcpyToSymbol(d_matricesConst, &matrices[i][0], matricesSizes[i], offset, cudaMemcpyHostToDevice);
+        cudaMemcpy(d_matricesConst + offset, &matrices[i][0], matricesSizes[i], cudaMemcpyHostToDevice);
         offset += matricesSizes[i];
     }
-    //startTimeInputCopy[0] = clock();
-    //cudaMemcpy(d_messages, messages, bytesLargest, cudaMemcpyHostToDevice);
-    //cudaMemcpy(d_keys, keys, bytesLargest, cudaMemcpyHostToDevice);
-    //endTimeInputCopy[0] = clock();
-
-    //startTimeExecute[0] = clock();
-    //for (int i = 0; i < 33554432 / 1024; i++)
-    //{
-    //    EncryptDESCuda << < 1024, numThreads >> > (d_messages, d_keys, d_resultsEncryption, i*1024);
-    //    // Decrypt all the encryption made by EncryptDesCuda above using DecryptDESCuda.
-    //    //DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
-    //    //cudaDeviceSynchronize();
-    //}
-    //cudaDeviceSynchronize(); // wait for encrypt to finish
-    //endTimeExecute[0] = clock();
-    //CHECK_CUDA_ERROR(cudaGetLastError());
-
-    //// cuda copy results 
-    //cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesLargest, cudaMemcpyDeviceToHost);
-    //cudaMemcpy(resultsDecryption, d_resultsDecryption, bytesLargest, cudaMemcpyDeviceToHost);
-    //endTimeRetrieveResults[0] = clock();
-
-    //goto EVALUATE_PERFORMANCE;
+    int endTimeCopyMatrices = clock(); // Used to measure the time GPU finishes execution since copying started.
+    CHECK_CUDA_ERROR(cudaGetLastError());
 
     for (int testCount = 0; testCount < NUM_TESTS_QUICK; testCount++)
     {
