@@ -47,6 +47,9 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* res
 	{
 		sharedX[threadIdx.x] = 0;
 		sharedY[threadIdx.x] = 0;
+	}
+	if (threadIdx.x == 0)
+	{
 		result = 0;
 	}
 	__syncthreads();
@@ -73,7 +76,7 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* res
 
 		// Round key
 		// Shift key to the right for the next iteration
-		leftCircularShiftCuda(sharedKey, sharedCopy, d_matricesConst[matricesIndices[6]+15-i]);
+		leftCircularShiftCuda(sharedKey, sharedCopy, d_matricesConst[matricesIndices[6]+i]);
 
 		// Preserve the current shifted key (sharedKey) for the next iteration.
 		sharedRoundkey[threadIdx.x] = sharedKey[threadIdx.x];

@@ -19,7 +19,7 @@
 } 
 #define DEBUG_ITERATION 100
 #define NUM_TESTS 9
-#define NUM_TESTS_QUICK 1
+#define NUM_TESTS_QUICK 6
 int main()
 {
     // kernel parameters
