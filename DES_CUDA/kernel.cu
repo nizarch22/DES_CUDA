@@ -19,7 +19,7 @@
 } 
 #define DEBUG_ITERATION 100
 #define NUM_TESTS 9
-#define NUM_TESTS_QUICK 9
+#define NUM_TESTS_QUICK 1
 int main()
 {
     // kernel parameters
@@ -140,7 +140,57 @@ int main()
     // Quick validation
     for (int i = 0; i < numMessages[0]; i++)
     {
+        uint64_t temp;
+        EncryptDES(messages[i], keys[i], temp);
+        if (temp != resultsEncryption[i])
+        {
+            std::cout << "Occured at " << i << "\n";
+            for (int i = 0; i < 64; i++)
+            {
+                std::cout << ((messages[i] >> i) & 1) << ",";
+            }
+            std::cout << "\n";
+            for (int i = 0; i < 64; i++)
+            {
+                std::cout << ((resultsDecryption[i] >> i) & 1) << ",";
+            }
+            std::cout << "\n";
+            return -1;
+        }
         bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
+        if (!bEqualDecrypt)
+        {
+            for (int i = 0; i < 64; i++)
+            {
+                std::cout << ((messages[i] >> i) & 1) << ",";
+            }
+            std::cout << "\n";
+            for (int i = 0; i < 64; i++)
+            {
+                std::cout << ((resultsDecryption[i] >> i) & 1) << ",";
+            }
+            std::cout << "\n";
+            return -1;
+        }
+    }
+    // Quick validation
+    for (int i = 0; i < numMessages[0]; i++)
+    {
+        bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
+        if (!bEqualDecrypt)
+        {
+            for (int i = 0; i < 64; i++)
+            {
+                std::cout << ((messages[i] >> i) & 1) << ",";
+            }
+            std::cout << "\n";
+            for (int i = 0; i < 64; i++)
+            {
+                std::cout << ((resultsDecryption[i] >> i) & 1) << ",";
+            }
+            std::cout << "\n";
+            return -1;
+        }
     }
 
     if (!bEqualDecrypt)
