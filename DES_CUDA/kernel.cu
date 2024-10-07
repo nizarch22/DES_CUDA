@@ -115,11 +115,11 @@ int main()
         //// Run Encryption & Decryption in CUDA stage ////
         // Encrypt the messages using EncryptDESCuda. 
         startTimeExecute[testCount] = clock();
-        EncryptDESCuda << < numMessages[testCount], numThreads >> > (d_messages, d_keys, d_resultsEncryption);
+        EncryptDESCuda << < numMessages[testCount], numThreads >> > (d_messages, d_keys, d_resultsEncryption, d_matricesConst, d_SBoxesConst);
         cudaDeviceSynchronize(); // wait for encrypt to finish
 
         // Decrypt all the encryption made by EncryptDesCuda above using DecryptDESCuda.
-        //DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption);
+        //DecryptDESCuda << <numMessages[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption, d_matricesConst, d_SBoxesConst);
         //cudaDeviceSynchronize();
         endTimeExecute[testCount] = clock();
 
