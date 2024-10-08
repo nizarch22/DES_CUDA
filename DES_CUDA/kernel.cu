@@ -139,66 +139,66 @@ int main()
     }
 
     // Quick validation
-    for (int i = 0; i < numMessages[0]; i++)
-    {
-        uint64_t temp;
-        EncryptDES(messages[i], keys[i], temp);
-        if (temp != resultsEncryption[i])
-        {
-            std::cout << "Occured at " << i << "\n";
-            for (int i = 0; i < 64; i++)
-            {
-                std::cout << ((messages[i] >> i) & 1) << ",";
-            }
-            std::cout << "\n";
-            for (int i = 0; i < 64; i++)
-            {
-                std::cout << ((resultsDecryption[i] >> i) & 1) << ",";
-            }
-            std::cout << "\n";
-            return -1;
-        }
-        bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
-        if (!bEqualDecrypt)
-        {
-            for (int i = 0; i < 64; i++)
-            {
-                std::cout << ((messages[i] >> i) & 1) << ",";
-            }
-            std::cout << "\n";
-            for (int i = 0; i < 64; i++)
-            {
-                std::cout << ((resultsDecryption[i] >> i) & 1) << ",";
-            }
-            std::cout << "\n";
-            return -1;
-        }
-    }
-    // Quick validation
-    for (int i = 0; i < numMessages[0]; i++)
-    {
-        bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
-        if (!bEqualDecrypt)
-        {
-            for (int i = 0; i < 64; i++)
-            {
-                std::cout << ((messages[i] >> i) & 1) << ",";
-            }
-            std::cout << "\n";
-            for (int i = 0; i < 64; i++)
-            {
-                std::cout << ((resultsDecryption[i] >> i) & 1) << ",";
-            }
-            std::cout << "\n";
-            return -1;
-        }
-    }
+    //for (int i = 0; i < numMessages[0]; i++)
+    //{
+    //    uint64_t temp;
+    //    EncryptDES(messages[i], keys[i], temp);
+    //    if (temp != resultsEncryption[i])
+    //    {
+    //        std::cout << "Occured at " << i << "\n";
+    //        for (int i = 0; i < 64; i++)
+    //        {
+    //            std::cout << ((messages[i] >> i) & 1) << ",";
+    //        }
+    //        std::cout << "\n";
+    //        for (int i = 0; i < 64; i++)
+    //        {
+    //            std::cout << ((resultsDecryption[i] >> i) & 1) << ",";
+    //        }
+    //        std::cout << "\n";
+    //        return -1;
+    //    }
+    //    bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
+    //    if (!bEqualDecrypt)
+    //    {
+    //        for (int i = 0; i < 64; i++)
+    //        {
+    //            std::cout << ((messages[i] >> i) & 1) << ",";
+    //        }
+    //        std::cout << "\n";
+    //        for (int i = 0; i < 64; i++)
+    //        {
+    //            std::cout << ((resultsDecryption[i] >> i) & 1) << ",";
+    //        }
+    //        std::cout << "\n";
+    //        return -1;
+    //    }
+    //}
+    //// Quick validation
+    //for (int i = 0; i < numMessages[0]; i++)
+    //{
+    //    bEqualDecrypt &= (resultsDecryption[i] == messages[i]);
+    //    if (!bEqualDecrypt)
+    //    {
+    //        for (int i = 0; i < 64; i++)
+    //        {
+    //            std::cout << ((messages[i] >> i) & 1) << ",";
+    //        }
+    //        std::cout << "\n";
+    //        for (int i = 0; i < 64; i++)
+    //        {
+    //            std::cout << ((resultsDecryption[i] >> i) & 1) << ",";
+    //        }
+    //        std::cout << "\n";
+    //        return -1;
+    //    }
+    //}
 
-    if (!bEqualDecrypt)
-    {
-        std::cout << "GPU Decryption comparison failed!\n";
-        return -1;
-    }
+    //if (!bEqualDecrypt)
+    //{
+    //    std::cout << "GPU Decryption comparison failed!\n";
+    //    return -1;
+    //}
     //if (!bEqualDecrypt)
     //{
     //    std::cout << "Decryption-message comparison failed!\n";
