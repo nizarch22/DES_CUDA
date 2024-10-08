@@ -103,25 +103,29 @@ int main()
         }
         // cuda copy memory - messages, keys
         startTimeInputCopy[testCount] = clock();
-        cudaMemcpy(d_messages, messages, bytesMessages[testCount], cudaMemcpyHostToDevice);
-        cudaMemcpy(d_keys, keys, bytesKeys[testCount], cudaMemcpyHostToDevice);
+        //cudaMemcpy(d_messages, messages, bytesMessages[testCount], cudaMemcpyHostToDevice);
+        //cudaMemcpy(d_keys, keys, bytesKeys[testCount], cudaMemcpyHostToDevice);
         endTimeInputCopy[testCount] = clock();
 
         //// Run Encryption & Decryption in CUDA stage ////
         // We encrypt the messages using EncryptDESCuda. Then, we use all those encrypted messages to run DecryptDESCuda.
         startTimeExecute[testCount] = clock();
-        EncryptDESCuda << < numBlocks[testCount], numThreads>> > (d_messages, d_keys, d_resultsEncryption, d_matricesConst, d_SBoxesConst);
-        cudaDeviceSynchronize(); // wait for encrypt to finish
+        //EncryptDESCuda << < numBlocks[testCount], numThreads>> > (d_messages, d_keys, d_resultsEncryption, d_matricesConst, d_SBoxesConst);
+        //cudaDeviceSynchronize(); // wait for encrypt to finish
         //DecryptDESCuda << <numBlocks[testCount], numThreads >> > (d_resultsEncryption, d_keys, d_resultsDecryption, d_matricesConst, d_SBoxesConst);
         //cudaDeviceSynchronize();
+        for (int i = 0; i < numMessages[testCount]; i++)
+        {
+            EncryptDES(messages[i], keys[i], encryptions[i]);
+        }
         endTimeExecute[testCount] = clock();
         // cuda copy results 
-        cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
-        cudaMemcpy(resultsDecryption, d_resultsDecryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
+        //cudaMemcpy(resultsEncryption, d_resultsEncryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
+        //cudaMemcpy(resultsDecryption, d_resultsDecryption, bytesMessages[testCount], cudaMemcpyDeviceToHost);
         endTimeRetrieveResults[testCount] = clock();
 
         // cuda check for errors in CUDA execution
-        CHECK_CUDA_ERROR(cudaGetLastError());
+        //CHECK_CUDA_ERROR(cudaGetLastError());
 
         //startTimeCPU[testCount] = clock();
         //for (int i = 0; i < numMessages[testCount]; i++)
