@@ -36,7 +36,8 @@ __global__ void EncryptDESCuda(uint64_t* messages, uint64_t* keys, uint64_t* res
 	// Initial operations 
 	permuteMatrixCuda(input, &d_matricesConst[0], 64); //initialPermutation(input);
 	permuteMatrixCuda(shiftedKey, &d_matricesConst[64], 56); // PC1 of key
-
+	permuteMatrixCuda(input2, &d_matricesConst[0], 64); //initialPermutation(input);
+	permuteMatrixCuda(shiftedKey2, &d_matricesConst[64], 56); // PC1 of key
 	for (int i = 0; i < 16; i++)
 	{
 		// Preserving L,R.
