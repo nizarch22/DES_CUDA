@@ -32,21 +32,18 @@ Note: A higher size will typically showcase a higher speedup as compared from CP
 
 ### Available modes:
 #### GPU only 
-1. **Only GPU, only encryption**: (*Branch* - ***EncryptionOnlyChangingSizeGPUOnly**)*\
-To get accurate throughput results with the GPU only. 
-2. **Only GPU, encryption and decryption**: *(Branch - **ChangingSizeGPUOnly**)*\
-verifies encryption-decryption by original message comparison with the GPU only. Confirming that the decryptions are identical to the original messages. 
+1. **Only GPU 64-bit granularity, only encryption**: (*Branch* - ***GPUOnly_64bitGranularity**)*\
+Throughput only.
+2. **Only GPU 128-bit granularity, encryption**: *(Branch - **GPUOnly_128bitGranularity**)*\
+Throughput only.
 #### GPU vs CPU comparison 
-1. **GPU and CPU, only encryption**: *(Branch - **EncryptionOnlyChangingSize**)*\
-Throughput comparison (speedup, execution time) for GPU vs CPU.
-2. **GPU and CPU, encryption and decryption**: *(Branch - **ChangingSize**)*\
-Throughput, memory allocation, and memory copy comparison (speedup, execution/copy/allocation time) for GPU vs CPU.\
-verifies encryption-decryption by original message comparison between GPU and CPU. Confirming both decryptions are identical to the original messages.
+1. **GPU 1 bit granularity, only encryption**: *(Branch - **GPUOnly_1bitGranularity**)*\
+Throughput only.
+2. **CPU, encryption**: *(Branch - **CPUOnly**)*\
+Get CPU's throughput.
 
-
-
-
-
+#### Important note
+Other modes are available. However, they need to be configured. At this current time, they may be accessed - but the user access them at their own discretion.
 
 
 
