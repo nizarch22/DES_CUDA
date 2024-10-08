@@ -285,8 +285,8 @@ EVALUATE_PERFORMANCE:
     CHECK_CUDA_ERROR(cudaFree(d_keys));
     CHECK_CUDA_ERROR(cudaFree(d_resultsEncryption));
     CHECK_CUDA_ERROR(cudaFree(d_resultsDecryption));
-    //int a;
-    //cudaOccupancyMaxActiveBlocksPerMultiprocessor(&a, EncryptDESCuda, 32, 0);
-    //std::cout << "Number of resident blocks: " << a << "\n";
+    int a;
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&a, EncryptDESCuda, 64, 0);
+    std::cout << "Number of resident blocks: " << a << "\n";
     return 0;
 }
