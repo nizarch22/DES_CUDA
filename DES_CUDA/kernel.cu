@@ -19,7 +19,7 @@
 } 
 #define DEBUG_ITERATION 100
 #define NUM_TESTS 9
-#define NUM_TESTS_QUICK 9
+#define NUM_TESTS_QUICK 4
 int main()
 {
     // kernel parameters
@@ -199,5 +199,8 @@ int main()
     CHECK_CUDA_ERROR(cudaFree(d_resultsEncryption));
     CHECK_CUDA_ERROR(cudaFree(d_resultsDecryption));
 
+    int a;
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&a, EncryptDESCuda, 128, 0);
+    std::cout << "Number of resident blocks: " << a << "\n";
     return 0;
 }
