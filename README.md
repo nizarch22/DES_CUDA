@@ -25,13 +25,13 @@ Note: A higher size will typically showcase a more accurate representation of th
 1. **Only GPU 64-bit granularity**: (*Branch* - ***GPUOnly_64bitGranularity**)*\
 Encrypt/Decrypt one message per thread.
 2. **Only GPU 128-bit granularity**: *(Branch - **GPUOnly_128bitGranularity**)*\
-Encrypt 2 messages per thread.
+Encrypt/Decrypt 2 messages per thread.
 3. **GPU 1 bit granularity**: *(Branch - **GPUOnly_1bitGranularity**)*\
 Encrypt/Decrypt one message using 64 threads.
 
 #### CPU Only 
 4. **CPU - sequential**: *(Branch - **CPUOnly**)*\
-Get CPU's throughput.
+Encrypt/Decrypt one CPU without assigned roles to the threads.
 
 #### Important note
 Other modes are available. However, they need to be configured. At this current time, they may be accessed - but the user access them at their own discretion.
