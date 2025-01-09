@@ -12,8 +12,9 @@ Must have an Nvidia GPU with the CUDA framework installed on the OS running this
 
 ## How to use the program:
 ### Running the program
-Choose a desired mode from the "Available modes" section below. Check out to the branch corresponding to the desired mode. Go to 'kernel.cu'.\
-Finally, run in release mode for more reliable (and faster) results.
+1. Checkout to a branch using the desired mode from the "Available modes" section found below.\
+2. Go to 'kernel.cu'.\
+3. Run in release mode for more reliable (and faster) results.
 
 ### Vary the size of messages (1MB-256MB)
 Change "NUM_TESTS_QUICK" in kernel.cu from 1-9 to determine a range mapped to 1MB,2MB,4MB,...,256MB.\
@@ -32,14 +33,15 @@ Note: A higher size will typically showcase a higher speedup as compared from CP
 
 ### Available modes:
 #### GPU only 
-1. **Only GPU 64-bit granularity, only encryption**: (*Branch* - ***GPUOnly_64bitGranularity**)*\
-Throughput only.
-2. **Only GPU 128-bit granularity, encryption**: *(Branch - **GPUOnly_128bitGranularity**)*\
-Throughput only.
-#### GPU vs CPU comparison 
-1. **GPU 1 bit granularity, only encryption**: *(Branch - **GPUOnly_1bitGranularity**)*\
-Throughput only.
-2. **CPU, encryption**: *(Branch - **CPUOnly**)*\
+1. **Only GPU 64-bit granularity**: (*Branch* - ***GPUOnly_64bitGranularity**)*\
+Encrypt/Decrypt one message per thread.
+2. **Only GPU 128-bit granularity**: *(Branch - **GPUOnly_128bitGranularity**)*\
+Encrypt 2 messages per thread.
+3. **GPU 1 bit granularity**: *(Branch - **GPUOnly_1bitGranularity**)*\
+Encrypt/Decrypt one message using 64 threads.
+
+#### CPU Only 
+4. **CPU - sequential**: *(Branch - **CPUOnly**)*\
 Get CPU's throughput.
 
 #### Important note
