@@ -12,7 +12,7 @@ Must have an Nvidia GPU with the CUDA framework installed on the OS running this
 
 ## How to use the program:
 ### Running the program
-1. Checkout to a branch using the desired mode from the "Available modes" section found below.\
+1. Checkout to a branch using the desired mode from the "Available modes" section found below.
 2. Go to 'kernel.cu'.
 3. Run in release mode for more reliable (and faster) results.
 
