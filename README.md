@@ -18,7 +18,7 @@ Must have an Nvidia GPU with the CUDA framework installed on the OS running this
 
 ### Vary the size of messages (1MB-256MB)
 Change "NUM_TESTS_QUICK" in kernel.cu from 1-9 to set the size of messages being encrypted/decrypted where 1 maps to 1MB, 2 maps to 2MB, 3 maps to 4MB,..., 9 maps to 256MB. The default is 9 i.e. 256MB.\
-Note: A higher size will typically showcase a more accurate representation of the speedup from CPU to GPU. This is true because the measurement is accurate to 1ms, and that means the runtime needs to be higher to achieve accurate results. The results remain accurate remains true as long as the GPU is not overburdened, but even then it is likely to outperform the CPU. 
+Note: A higher size will typically showcase a more accurate representation of the speedup from CPU to GPU. This is true because the measurement is accurate to 1ms, meaning the runtime needs to be higher to achieve accurate results. The results remain accurate as long as the GPU is not overburdened, but even then it is likely to outperform the CPU. 
 
 ### Available modes:
 #### GPU only 
