@@ -31,7 +31,7 @@ Encrypt/Decrypt one message using 64 threads.
 
 #### CPU Only 
 4. **CPU - sequential**: *(Branch - **CPUOnly**)*\
-Encrypt/Decrypt one CPU without assigned roles to the threads.
+Encrypt/Decrypt one message onthe CPU without assigned roles to the threads. This optimization is left up to the CPU itself.
 
 #### Important note
 Other modes are available. However, they need to be configured. At this current time, they may be accessed - but the user access them at their own discretion.
